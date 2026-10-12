@@ -624,6 +624,7 @@ async function onLoggedIn(token, user) {
   store.isAdmin = user.role === "admin";
   closeModal();
   await refreshProfile();
+  updateAuthButton();
   showDashboard("overview");
   toast("مرحباً " + (user.full_name || user.username));
 }
@@ -633,12 +634,14 @@ async function refreshProfile() {
     const d = await apiGet("/api/user/profile");
     store.currentUser = d.user;
     store.isAdmin = d.user.role === "admin";
+    updateAuthButton();
   } catch (e) { /* not logged in */ }
 }
 
 async function logout() {
   Token.set(null);
   store.currentUser = null; store.isAdmin = false;
+  updateAuthButton();
   setRoute("/"); toast("تم تسجيل الخروج");
 }
 
@@ -986,6 +989,18 @@ document.addEventListener("click", e => {
   const panel = e.target.closest("[data-panel]");
   if (panel) { store.currentUser ? showDashboard(panel.dataset.panel) : loginModal(); return; }
 });
+function updateAuthButton() {
+  const btn = $("#loginBtn");
+  if (!btn) return;
+  if (store.currentUser) {
+    btn.textContent = "حسابي";
+    btn.classList.remove("primary");
+  } else {
+    btn.textContent = store.lang === "ar" ? "دخول" : "Sign in";
+    btn.classList.add("primary");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const searchInput = $("#searchInput");
   if (searchInput) searchInput.addEventListener("input", () => renderProducts(store.route));
@@ -1011,6 +1026,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Restore session
   if (Token.get()) { await refreshProfile(); }
+  updateAuthButton();
   await loadProducts();
   setRoute(location.pathname, false);
 });
