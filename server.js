@@ -339,6 +339,8 @@ async function migrateDb() {
     ["products", "active", "`active` TINYINT(1) NOT NULL DEFAULT 1"],
     ["products", "is_free", "`is_free` TINYINT(1) NOT NULL DEFAULT 0"],
     // orders
+    ["orders", "user_id", "`user_id` INT NULL"],
+    ["orders", "product_id", "`product_id` INT NULL"],
     ["orders", "order_number", "`order_number` VARCHAR(24) NULL"],
     ["orders", "quantity", "`quantity` INT NOT NULL DEFAULT 1"],
     ["orders", "total_price", "`total_price` DECIMAL(12,2) NOT NULL DEFAULT 0"],
@@ -650,7 +652,7 @@ app.post("/api/orders", auth, async (req, res) => {
 });
 app.get("/api/orders", auth, async (req, res) => {
   try {
-    const rows = await q("SELECT o.*, p.name AS product_name FROM orders o JOIN products p ON p.id=o.product_id WHERE o.user_id=? ORDER BY o.id DESC", [req.user.id]);
+    const rows = await q("SELECT o.*, p.name AS product_name FROM orders o LEFT JOIN products p ON p.id=o.product_id WHERE o.user_id=? ORDER BY o.id DESC", [req.user.id]);
     res.json({ ok: true, orders: rows });
   } catch (e) { console.error(e); res.status(500).json({ error: "server_error" }); }
 });
