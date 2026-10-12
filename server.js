@@ -433,7 +433,12 @@ function admin(req, res, next) {
 async function maybePromote(email) {
   const em = String(email).trim().toLowerCase();
   if (cfg.adminEmails.includes(em)) {
-    await q("UPDATE users SET role='admin' WHERE LOWER(email)=?", [em]);
+    try {
+      const r = await q("UPDATE users SET role='admin' WHERE LOWER(TRIM(email))=LOWER(?)", [em]);
+      console.log(`[promote] ${em} -> admin, affected: ${r.affectedRows}`);
+    } catch (e) {
+      console.error("[promote] failed:", e.message);
+    }
   }
 }
 const isGmail = (e) => /^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(String(e).trim());
