@@ -386,15 +386,15 @@ async function initDb() {
   for (const [k, v] of defaults) {
     await pool.query("INSERT IGNORE INTO settings (`key`, `value`) VALUES (?, ?)", [k, v]);
   }
-  // seed 3 lawful products
-  const count = await q("SELECT COUNT(*) AS c FROM products");
-  if (Number(count[0].c) === 0) {
-    const seed = [
-      ["رقم واتساب جاهز", "Ready WhatsApp Number", "رقم واتساب مفعّل وجاهز للاستخدام الفوري مع ضمان الاستبدال.", "whatsapp", "numbers", 2.50, 100, 5],
-      ["رقم تيليجرام", "Telegram Number", "رقم تيليجرام مفعّل لتفعيل الحسابات والبوتات.", "telegram", "numbers", 1.75, 100, 5],
-      ["اشتراك بريميوم شهري", "Monthly Premium Subscription", "اشتراك بريميوم شهري لأشهر التطبيقات — تفعيل سريع ودعم متواصل.", "premium", "subscriptions", 4.99, 50, 2],
-    ];
-    for (const [name, nameEn, desc, cat, sub, price, stock, maxu] of seed) {
+  // seed 3 lawful products — insert any missing by name (legacy rows must not block seeding)
+  const seed = [
+    ["رقم واتساب جاهز", "Ready WhatsApp Number", "رقم واتساب مفعّل وجاهز للاستخدام الفوري مع ضمان الاستبدال.", "whatsapp", "numbers", 2.50, 100, 5],
+    ["رقم تيليجرام", "Telegram Number", "رقم تيليجرام مفعّل لتفعيل الحسابات والبوتات.", "telegram", "numbers", 1.75, 100, 5],
+    ["اشتراك بريميوم شهري", "Monthly Premium Subscription", "اشتراك بريميوم شهري لأشهر التطبيقات — تفعيل سريع ودعم متواصل.", "premium", "subscriptions", 4.99, 50, 2],
+  ];
+  for (const [name, nameEn, desc, cat, sub, price, stock, maxu] of seed) {
+    const exists = await q("SELECT id FROM products WHERE name=? LIMIT 1", [name]);
+    if (!exists.length) {
       await q(
         "INSERT INTO products (name, name_en, description, category, subcategory, price, stock, max_per_user, active) VALUES (?,?,?,?,?,?,?,?,1)",
         [name, nameEn, desc, cat, sub, price, stock, maxu]
