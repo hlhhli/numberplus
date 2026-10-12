@@ -323,268 +323,601 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const $ = (s, root=document) => root.querySelector(s);
-  const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-  const store = {
-    products: [
-      {id:1,name:"رقم واتساب — تفعيل فوري",category:"whatsapp",sub:"أرقام",price:.35,stock:24,max:3,icon:"💬",desc:"رقم رقمي مناسب لتفعيل حساب واتساب."},
-      {id:2,name:"رقم واتساب مميز",category:"whatsapp",sub:"أرقام",price:1.25,stock:12,max:2,icon:"📱",desc:"رقم مميز مع تفاصيل التسليم."},
-      {id:3,name:"رقم تيليجرام — عالمي",category:"telegram",sub:"أرقام",price:.5,stock:37,max:5,icon:"✈️",desc:"رقم عالمي لتفعيل حساب تيليجرام."},
-      {id:4,name:"رقم تيليجرام — خاص",category:"telegram",sub:"أرقام",price:1.8,stock:9,max:2,icon:"🌐",desc:"رقم رقمي لفترة توفر محدودة."},
-      {id:5,name:"متابعون إنستغرام",category:"instagram",sub:"خدمات",price:2.5,stock:100,max:10,icon:"📸",desc:"خدمة ترويج لحساب إنستغرام."},
-      {id:6,name:"إعجابات إنستغرام",category:"instagram",sub:"خدمات",price:.8,stock:100,max:20,icon:"💜",desc:"إعجابات لمنشورات إنستغرام."},
-      {id:7,name:"رقم واتساب — اقتصادي",category:"whatsapp",sub:"أرقام",price:.12,stock:18,max:5,icon:"📲",desc:"خيار اقتصادي للتفعيل الرقمي."},
-      {id:8,name:"رقم تيليجرام — اقتصادي",category:"telegram",sub:"أرقام",price:.09,stock:22,max:5,icon:"🛩️",desc:"خيار اقتصادي لتفعيل تيليجرام."}
-    ],
-    orders: JSON.parse(localStorage.getItem("np_orders") || "[]"),
-    tickets: JSON.parse(localStorage.getItem("np_tickets") || "[]"),
-    codes: JSON.parse(localStorage.getItem("np_codes") || "[]"),
-    users: JSON.parse(localStorage.getItem("np_users") || "[]"),
-    balance: Number(localStorage.getItem("np_balance") || 0),
-    currentUser: JSON.parse(sessionStorage.getItem("np_user") || "null"),
-    isAdmin: false, route: location.pathname, lang: "ar"
-  };
-  const translations = {
-    en: {
-      home:"Home", telegram:"Telegram", whatsapp:"WhatsApp", instagram:"Instagram", offers:"Offers", api:"API",
-      admin:"Admin", login:"Sign in", heroEyebrow:"Your trusted digital store", heroLine1:"Digital solutions", heroLine2:"made simple",
-      heroText:"Numbers and digital services, fast delivery, and an easy shopping experience in one place.",
-      browse:"Browse products", addBalance:"Add balance", availableProducts:"Available products", support:"24/7 support",
-      fastDelivery:"Fast delivery", categories:"Categories", categoriesSub:"Choose the service you need", numbers:"Numbers & services",
-      services:"Digital services", freeOffers:"Free offers", featured:"Featured products", productsSub:"Selected options from NumberPlus",
-      footer:"Digital services store"
+// NumberPlus - API-wired frontend
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const API = "";
+
+// ---------- Token & Auth State ----------
+const Token = {
+  get() { return localStorage.getItem("np_token") || ""; },
+  set(t) { t ? localStorage.setItem("np_token", t) : localStorage.removeItem("np_token"); },
+  headers() { const t = this.get(); return t ? { "Authorization": "Bearer " + t } : {}; }
+};
+
+async function api(method, path, body) {
+  const opts = { method, headers: { "Content-Type": "application/json", ...Token.headers() } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw { status: r.status, ...data };
+  return data;
+}
+const apiGet = p => api("GET", p);
+const apiPost = (p, b) => api("POST", p, b);
+const apiPut = (p, b) => api("PUT", p, b);
+const apiDel = p => api("DELETE", p);
+
+// ---------- Store ----------
+const store = {
+  products: [],
+  orders: [],
+  tickets: [],
+  notifications: [],
+  paymentMethods: [],
+  currentUser: null,
+  isAdmin: false,
+  route: location.pathname,
+  lang: localStorage.getItem("np_lang") || "ar"
+};
+
+function toast(message) {
+  const el = $("#toast"); el.textContent = message; el.classList.add("show");
+  clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => el.classList.remove("show"), 2600);
+}
+function money(n) { return "$" + Number(n || 0).toFixed(2); }
+function escapeHtml(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- Products ----------
+async function loadProducts() {
+  try {
+    const d = await apiGet("/api/products");
+    store.products = d.products || [];
+  } catch (e) {
+    console.error("products load failed", e);
+    store.products = [];
+  }
+  renderProducts(store.route);
+}
+
+const categoryNames = { whatsapp: "واتساب", telegram: "تيليجرام", instagram: "إنستغرام" };
+
+function renderProducts(filter = store.route) {
+  const search = $("#searchInput")?.value?.trim().toLowerCase() || "";
+  let items = store.products.slice();
+  const f = (filter || "/").replace(/^\//, "");
+  if (f && f !== "") {
+    const parts = f.split("/");
+    if (parts[0] === "offers") items = items.filter(p => Number(p.is_free));
+    else {
+      items = items.filter(p => (p.category || "").toLowerCase() === parts[0].toLowerCase());
+      if (parts[1]) items = items.filter(p => (p.subcategory || "").toLowerCase() === parts[1].toLowerCase());
+    }
+  }
+  if (search) items = items.filter(p => ((p.name || "") + " " + (p.description || "") + " " + (p.category || "")).toLowerCase().includes(search));
+  const titleEl = $("#productsTitle");
+  if (titleEl) {
+    titleEl.textContent = !f ? (store.lang === "ar" ? "منتجات مميزة" : "Featured products") :
+      f === "offers" ? (store.lang === "ar" ? "العروض المجانية" : "Free offers") :
+      (categoryNames[f.split("/")[0]] || f);
+  }
+  const grid = $("#productGrid");
+  if (!grid) return;
+  grid.innerHTML = items.length ? items.map(p => `
+    <article class="product card">
+      <div class="product-top">
+        <span class="product-icon">${p.logo_url ? `<img src="${escapeHtml(p.logo_url)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover">` : "📦"}</span>
+        <span class="badge">${escapeHtml(categoryNames[(p.category || "").toLowerCase()] || p.category || "")}</span>
+      </div>
+      <h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.description || "")}</p>
+      <div class="product-bottom"><div>
+        <div class="price">${money(p.price)} <small>USD</small></div>
+        <span class="stock">${p.stock > 0 ? `● متوفر (${p.stock})` : "غير متوفر"}</span>
+      </div>
+      <button class="btn primary buy-btn" data-buy="${p.id}">${Number(p.is_free) ? "احصل مجاناً" : "شراء"}</button></div>
+    </article>`).join("")
+    : `<div class="empty" style="grid-column:1/-1">لا توجد منتجات مطابقة.</div>`;
+  const stat = $("#statProducts");
+  if (stat) stat.textContent = store.products.length + "+";
+}
+
+// ---------- Navigation ----------
+function setRoute(path, push = true) {
+  store.route = path || "/";
+  if (push) history.pushState({}, "", store.route);
+  $("#storeView").classList.remove("hidden"); $("#dashboardView").classList.add("hidden");
+  renderProducts(store.route);
+  $$(".nav a").forEach(a => a.classList.toggle("active", a.dataset.route === store.route));
+}
+function openModal(title, html) {
+  $("#modalTitle").textContent = title; $("#modalBody").innerHTML = html; $("#modalBackdrop").classList.add("show");
+}
+function closeModal() { $("#modalBackdrop").classList.remove("show"); }
+
+// ---------- Auth UI ----------
+function loginModal() {
+  openModal("تسجيل الدخول", `
+    <form id="loginForm">
+      <div class="field"><label>البريد أو اسم المستخدم أو رقم العميل</label><input name="identifier" required placeholder="example@gmail.com"></div>
+      <div class="field"><label>كلمة المرور</label><input name="password" type="password" required></div>
+      <button class="btn primary" style="width:100%">دخول</button>
+    </form>
+    <button class="btn ghost" style="width:100%;margin-top:10px" id="showSignup">إنشاء حساب جديد</button>`);
+  $("#loginForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      const r = await apiPost("/api/auth/login", { identifier: d.identifier, password: d.password });
+      if (r.needOtp) { closeModal(); loginOtpModal(r.email); toast(r.emailSent ? "تم إرسال رمز OTP إلى بريدك" : "تعذر إرسال البريد — تحقق من الإعدادات"); }
+    } catch (err) {
+      toast(err.error === "bad_credentials" ? "بيانات الدخول غير صحيحة" : err.error === "banned" ? "الحساب محظور" : "خطأ في تسجيل الدخول");
     }
   };
-  const categoryNames = {whatsapp:"واتساب",telegram:"تيليجرام",instagram:"إنستغرام"};
-  const icons = ["#8e6bff","#41b6ff","#ff6b9e","#ff9955","#44d7b6","#e9ba48","#ae6cff","#47a9ff","#ff5680","#8dd85b",
-    "#cf71ff","#44d6e8","#f27764","#6680ff","#ed71b4","#73c9ff","#b4d544","#ffb45c","#7970ff","#54cf94",
-    "#e66bff","#5fcbff","#ff7481","#92bc49","#a18aff","#41a3e2","#ee9bcb","#67c9a0","#f9cb4b","#cb75f0",
-    "#448eff","#ff8265","#63dbd2","#aa6bff","#ff609f","#8daeff","#c7a93e","#5dcbff","#da7c63","#60bf84"];
+  $("#showSignup").onclick = signupModal;
+}
 
-  function persist() {
-    localStorage.setItem("np_orders", JSON.stringify(store.orders));
-    localStorage.setItem("np_tickets", JSON.stringify(store.tickets));
-    localStorage.setItem("np_codes", JSON.stringify(store.codes));
-    localStorage.setItem("np_users", JSON.stringify(store.users));
-    localStorage.setItem("np_balance", store.balance);
-  }
-  function toast(message) {
-    const el=$("#toast"); el.textContent=message; el.classList.add("show");
-    clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.classList.remove("show"),2600);
-  }
-  function money(n) { return "$" + Number(n).toFixed(2); }
-  function renderProducts(filter=store.route) {
-    const search=$("#searchInput")?.value?.trim().toLowerCase() || "";
-    let items=store.products.filter(p => filter==="/" || filter==="" || p.category===filter.replace("/","") || filter==="/offers");
-    if (filter==="/offers") items=store.products.slice(0,2);
-    items=items.filter(p => (p.name+" "+p.desc+" "+p.category).toLowerCase().includes(search));
-    $("#productsTitle").textContent = filter==="/" ? (store.lang==="ar"?"منتجات مميزة":"Featured products") :
-      filter==="/offers" ? (store.lang==="ar"?"عروض مجانية":"Free offers") : (categoryNames[filter.replace("/","")] || filter.replace("/",""));
-    $("#productGrid").innerHTML = items.length ? items.map(p=>`
-      <article class="product card">
-        <div class="product-top"><span class="product-icon">${p.icon}</span><span class="badge">${categoryNames[p.category]||p.category}</span></div>
-        <h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.desc)}</p>
-        <div class="product-bottom"><div><div class="price">${money(p.price)} <small>USD</small></div><span class="stock">${p.stock>0?`● متوفر (${p.stock})`:"غير متوفر"}</span></div>
-        <button class="btn primary buy-btn" data-buy="${p.id}">شراء</button></div>
-      </article>`).join("") : `<div class="empty" style="grid-column:1/-1">لا توجد منتجات مطابقة.</div>`;
-    $("#statProducts").textContent=store.products.length+"+";
-  }
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  }
-  function setRoute(path, push=true) {
-    store.route=path || "/";
-    if(push) history.pushState({}, "", store.route);
-    $("#storeView").classList.remove("hidden"); $("#dashboardView").classList.add("hidden");
-    renderProducts(store.route);
-    $$(".nav a").forEach(a=>a.classList.toggle("active",a.dataset.route===store.route));
-  }
-  function openModal(title, html) {
-    $("#modalTitle").textContent=title; $("#modalBody").innerHTML=html; $("#modalBackdrop").classList.add("show");
-  }
-  function closeModal() { $("#modalBackdrop").classList.remove("show"); }
-  function loginModal() {
-    openModal("تسجيل الدخول", `
-      <form id="loginForm">
-        <div class="field"><label>البريد أو اسم المستخدم أو رقم العميل</label><input name="identity" required placeholder="example@gmail.com"></div>
-        <div class="field"><label>كلمة المرور</label><input name="password" type="password" required></div>
-        <div class="field"><label>رمز التحقق لمرة واحدة (OTP)</label><input name="otp" inputmode="numeric" placeholder="رمز OTP"></div>
-        <button class="btn primary" style="width:100%">دخول</button>
-      </form>
-      <p class="modal-foot">تجريبي: استخدم أي بيانات للدخول. ربط OTP وتوثيق الحساب يحتاج إلى backend.</p>
-      <button class="btn ghost" style="width:100%;margin-top:10px" id="showSignup">إنشاء حساب جديد</button>`);
-    $("#loginForm").onsubmit=e=>{e.preventDefault(); const identity=new FormData(e.currentTarget).get("identity");
-      store.currentUser={name:String(identity).split("@")[0]||"عميل",id:"100001"}; sessionStorage.setItem("np_user",JSON.stringify(store.currentUser));
-      closeModal(); showDashboard("overview"); toast("تم تسجيل الدخول في وضع العرض");};
-    $("#showSignup").onclick=signupModal;
-  }
-  function signupModal() {
-    openModal("إنشاء حساب", `
-      <form id="signupForm">
-        <div class="field"><label>الاسم الكامل</label><input name="name" required></div>
-        <div class="field"><label>بريد Gmail</label><input name="email" type="email" required placeholder="name@gmail.com"></div>
-        <div class="field"><label>اسم المستخدم</label><input name="username" required></div>
-        <div class="field"><label>كلمة المرور</label><input name="password" type="password" required minlength="8"></div>
-        <label style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;margin:10px 0 14px"><input type="checkbox" required style="width:auto"> أوافق على سياسة الخصوصية والشروط</label>
-        <button class="btn primary" style="width:100%">إنشاء حساب وإرسال OTP</button>
-      </form><p class="modal-foot">في هذا النموذج التجريبي يتم إنشاء معرف عميل محلي. لا يتم إرسال OTP فعلياً.</p>`);
-    $("#signupForm").onsubmit=e=>{
-      e.preventDefault(); const d=Object.fromEntries(new FormData(e.currentTarget));
-      if(!String(d.email).toLowerCase().endsWith("@gmail.com")) return toast("يرجى استخدام بريد Gmail");
-      const user={name:d.name, username:d.username, email:d.email, id:String(Math.floor(100000+Math.random()*900000)), avatar:"🌸"};
-      store.users.push({...user,banned:false}); store.currentUser=user; sessionStorage.setItem("np_user",JSON.stringify(user)); persist();
-      closeModal(); showDashboard("overview"); toast("تم إنشاء الحساب التجريبي · رقم العميل "+user.id);
-    };
-  }
-  function showDashboard(panel="overview") {
-    $("#storeView").classList.add("hidden"); $("#dashboardView").classList.remove("hidden");
-    const admin=store.isAdmin;
-    $("#panelTitle").textContent=admin?"لوحة الإدارة":"لوحة المستخدم";
-    ["adminProductsLink","adminOrdersLink","adminUsersLink","adminSettingsLink"].forEach(id=>$("#"+id).classList.toggle("hidden",!admin));
-    $$(".side-link").forEach(b=>b.classList.toggle("active",b.dataset.panel===panel));
-    renderPanel(panel);
-  }
-  function renderPanel(panel) {
-    const user=store.currentUser || {name:"زائر",id:"—",avatar:"🧑"};
-    const content=$("#panelContent");
-    const titleMap={
-      overview:"نظرة عامة",orders:"طلباتي",balance:"الرصيد والشحن",codes:"أكواد الهدايا",tickets:"الدعم والتذاكر",
-      offers:"العروض المجانية",api:"توثيق API",settings:"المظهر والإعدادات","admin-products":"إضافة وإدارة المنتجات",
-      "admin-orders":"إدارة الطلبات","admin-users":"إدارة المستخدمين","admin-settings":"الإعدادات والأكواد"
-    };
-    if(panel==="overview") content.innerHTML=`
-      <div class="section-box"><span class="badge">${store.isAdmin?"مدير المتجر":"حساب العميل"}</span>
-        <h2 style="margin-bottom:6px">${user.avatar||"🧑"} أهلاً، ${escapeHtml(user.name||"عميل")}</h2>
-        <p style="color:var(--muted);font-size:13px">رقم العميل: ${user.id||"100001"} · رصيدك الحالي: <b>${money(store.balance)}</b></p>
+function loginOtpModal(email) {
+  openModal("رمز التحقق", `
+    <form id="loginOtpForm">
+      <p style="color:var(--muted);font-size:13px">أدخل رمز OTP المرسل إلى ${escapeHtml(email)}</p>
+      <div class="field"><label>رمز OTP</label><input name="otp" inputmode="numeric" required placeholder="6 أرقام" maxlength="6"></div>
+      <button class="btn primary" style="width:100%">تأكيد الدخول</button>
+    </form>`);
+  $("#loginOtpForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      const r = await apiPost("/api/auth/login-otp", { email, otp: d.otp });
+      onLoggedIn(r.token, r.user);
+    } catch (err) {
+      toast(err.error === "bad_otp" ? "الرمز غير صحيح" : "خطأ في التحقق");
+    }
+  };
+}
+
+function signupModal() {
+  openModal("إنشاء حساب", `
+    <form id="signupForm">
+      <div class="field"><label>الاسم الكامل</label><input name="fullName" required></div>
+      <div class="field"><label>بريد Gmail</label><input name="email" type="email" required placeholder="name@gmail.com"></div>
+      <div class="field"><label>اسم المستخدم</label><input name="username" required></div>
+      <div class="field"><label>كلمة المرور</label><input name="password" type="password" required minlength="6"></div>
+      <div class="field"><label>تأكيد كلمة المرور</label><input name="confirmPassword" type="password" required minlength="6"></div>
+      <label style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;margin:10px 0 14px"><input type="checkbox" required style="width:auto"> أوافق على سياسة الخصوصية والشروط</label>
+      <button class="btn primary" style="width:100%">إنشاء حساب وإرسال OTP</button>
+    </form>`);
+  $("#signupForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    if (!String(d.email).toLowerCase().endsWith("@gmail.com")) return toast("يرجى استخدام بريد Gmail");
+    if (d.password !== d.confirmPassword) return toast("كلمتا المرور غير متطابقتين");
+    try {
+      const r = await apiPost("/api/auth/register", { fullName: d.fullName, email: d.email, username: d.username, password: d.password, lang: store.lang });
+      closeModal(); signupOtpModal(d.email);
+      toast(r.emailSent ? "تم إرسال رمز OTP إلى بريدك" : "تم إنشاء الحساب — تعذر إرسال البريد");
+    } catch (err) {
+      toast(err.error === "exists" ? "البريد أو اسم المستخدم مسجل مسبقاً" : err.error === "gmail_only" ? "يرجى استخدام بريد Gmail" : "خطأ في إنشاء الحساب");
+    }
+  };
+}
+
+function signupOtpModal(email) {
+  openModal("تفعيل الحساب", `
+    <form id="signupOtpForm">
+      <p style="color:var(--muted);font-size:13px">أدخل رمز OTP المرسل إلى ${escapeHtml(email)}</p>
+      <div class="field"><label>رمز OTP</label><input name="otp" inputmode="numeric" required placeholder="6 أرقام" maxlength="6"></div>
+      <button class="btn primary" style="width:100%">تفعيل الحساب</button>
+    </form>`);
+  $("#signupOtpForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      const r = await apiPost("/api/auth/verify-otp", { email, otp: d.otp });
+      onLoggedIn(r.token, r.user);
+      toast("تم إنشاء حسابك! رقم العميل: " + r.user.customer_id);
+    } catch (err) {
+      toast(err.error === "bad_otp" ? "الرمز غير صحيح" : "خطأ في التفعيل");
+    }
+  };
+}
+
+async function onLoggedIn(token, user) {
+  Token.set(token);
+  store.currentUser = user;
+  store.isAdmin = user.role === "admin";
+  closeModal();
+  await refreshProfile();
+  showDashboard("overview");
+  toast("مرحباً " + (user.full_name || user.username));
+}
+
+async function refreshProfile() {
+  try {
+    const d = await apiGet("/api/user/profile");
+    store.currentUser = d.user;
+    store.isAdmin = d.user.role === "admin";
+  } catch (e) { /* not logged in */ }
+}
+
+async function logout() {
+  Token.set(null);
+  store.currentUser = null; store.isAdmin = false;
+  setRoute("/"); toast("تم تسجيل الخروج");
+}
+
+// ---------- Dashboard ----------
+function showDashboard(panel = "overview") {
+  $("#storeView").classList.add("hidden"); $("#dashboardView").classList.remove("hidden");
+  $("#panelTitle").textContent = store.isAdmin ? "لوحة الإدارة" : "لوحة المستخدم";
+  ["adminProductsLink", "adminOrdersLink", "adminUsersLink", "adminSettingsLink"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", !store.isAdmin);
+  });
+  $$(".side-link").forEach(b => b.classList.toggle("active", b.dataset.panel === panel));
+  renderPanel(panel);
+}
+
+async function renderPanel(panel) {
+  const user = store.currentUser || { full_name: "زائر", customer_id: "—" };
+  const content = $("#panelContent");
+  const titleMap = {
+    overview: "نظرة عامة", orders: "طلباتي", balance: "الرصيد والشحن", codes: "أكواد الهدايا", tickets: "الدعم والتذاكر",
+    offers: "العروض المجانية", api: "توثيق API", settings: "المظهر والإعدادات",
+    "admin-products": "إضافة وإدارة المنتجات", "admin-orders": "إدارة الطلبات",
+    "admin-users": "إدارة المستخدمين", "admin-settings": "الإعدادات والأكواد"
+  };
+
+  if (panel === "overview") {
+    let myOrders = [];
+    try { const d = await apiGet("/api/orders"); myOrders = d.orders || []; } catch (e) {}
+    content.innerHTML = `
+      <div class="section-box"><span class="badge">${store.isAdmin ? "مدير المتجر" : "حساب العميل"}</span>
+        <h2 style="margin-bottom:6px">${user.avatar_svg ? `<span style="display:inline-block;width:36px;height:36px;vertical-align:middle">${user.avatar_svg}</span>` : "🧑"} أهلاً، ${escapeHtml(user.full_name || user.username || "عميل")}</h2>
+        <p style="color:var(--muted);font-size:13px">رقم العميل: ${escapeHtml(user.customer_id || "—")} · رصيدك الحالي: <b>${money(user.balance)}</b></p>
         <div class="form-actions"><button class="btn primary" data-jump="balance">شحن الرصيد</button><button class="btn" data-jump="orders">عرض الطلبات</button></div>
       </div>
-      <div class="grid-2"><div class="section-box"><span class="badge">الرصيد</span><h2>${money(store.balance)}</h2><p style="color:var(--muted);font-size:12px">الرصيد التجريبي لهذا المتصفح.</p></div>
-      <div class="section-box"><span class="badge">الطلبات</span><h2>${store.orders.length}</h2><p style="color:var(--muted);font-size:12px">إجمالي طلبات الحساب.</p></div></div>`;
-    if(panel==="orders" || panel==="admin-orders") content.innerHTML=`<div class="section-box"><div class="section-head"><div><h2>${titleMap[panel]}</h2><p>متابعة حالة الطلب والتسليم</p></div></div>${ordersTable()}</div>`;
-    if(panel==="balance") content.innerHTML=`
-      <div class="section-box"><h2>الرصيد والشحن</h2><p style="color:var(--muted)">الرصيد الحالي: <b>${money(store.balance)}</b></p>
       <div class="grid-2">
-        <div class="section-box"><h3>USDT · Cryptomus</h3><p style="color:var(--muted);font-size:12px">واجهة تجريبية — أضف إعدادات API في الخادم لإتمام الدفع تلقائياً.</p><button class="btn primary" data-pay="cryptomus">إنشاء طلب دفع</button></div>
-        <div class="section-box"><h3>طرق دفع يدوية</h3><p style="color:var(--muted);font-size:12px">Zain Cash: أضف رقم الحساب من لوحة الإدارة.<br>Asia Hawala: أضف رقم الحساب من لوحة الإدارة.</p><button class="btn" data-pay="manual">عرض تعليمات الدفع</button></div>
+        <div class="section-box"><span class="badge">الرصيد</span><h2>${money(user.balance)}</h2></div>
+        <div class="section-box"><span class="badge">الطلبات</span><h2>${myOrders.length}</h2></div>
+      </div>`;
+  }
+
+  if (panel === "orders") {
+    content.innerHTML = `<div class="section-box"><h2>طلباتي</h2><div id="ordersWrap"><div class="empty">جارٍ التحميل…</div></div></div>`;
+    try {
+      const d = await apiGet("/api/orders");
+      const orders = d.orders || [];
+      $("#ordersWrap").innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>المنتج</th><th>الكمية</th><th>المبلغ</th><th>الحالة</th></tr></thead><tbody>${orders.map(o => `<tr><td>${escapeHtml(o.order_number)}</td><td>${escapeHtml(o.product_name || o.name || "")}</td><td>${o.quantity}</td><td>${money(o.total_price)}</td><td><span class="pill ${o.status === "completed" ? "" : "pending"}">${escapeHtml(o.status)}</span></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد طلبات حالياً.</div>';
+    } catch (e) { $("#ordersWrap").innerHTML = '<div class="empty">تعذر تحميل الطلبات.</div>'; }
+  }
+
+  if (panel === "balance") {
+    let methods = [];
+    try { const d = await apiGet("/api/payment/methods"); methods = d.methods || []; } catch (e) {}
+    content.innerHTML = `
+      <div class="section-box"><h2>الرصيد والشحن</h2><p style="color:var(--muted)">الرصيد الحالي: <b>${money(user.balance)}</b></p>
+      <div class="grid-2">
+        <div class="section-box"><h3>USDT · Cryptomus (تلقائي)</h3>
+          <div class="field"><label>المبلغ بالدولار</label><input id="usdtAmount" type="number" min="1" step="0.01" value="10"></div>
+          <button class="btn primary" id="usdtPayBtn">إنشاء فاتورة دفع</button>
+          <div id="usdtResult" style="margin-top:10px"></div>
+        </div>
+        <div class="section-box"><h3>طرق دفع يدوية</h3>
+          ${methods.filter(m => m.type === "manual").map(m => { const c = m.config || {}; return `<div style="margin-bottom:12px"><b>${escapeHtml(m.name)}</b><p style="color:var(--muted);font-size:12px">${escapeHtml(c.instructions || "")}<br>الحساب: <b dir="ltr">${escapeHtml(c.account || "")}</b></p></div>`; }).join("") || '<p style="color:var(--muted);font-size:12px">لا توجد طرق يدوية مضافة بعد.</p>'}
+        </div>
       </div></div>`;
-    if(panel==="codes") content.innerHTML=`<div class="section-box"><h2>استبدال كود رصيد</h2><p style="color:var(--muted);font-size:12px">أدخل كود الهدية أو الرصيد.</p><div class="toolbar"><input id="redeemCode" placeholder="مثال: NP-ABC123"><button class="btn primary" id="redeemBtn">استبدال</button></div></div>`;
-    if(panel==="tickets") content.innerHTML=`<div class="section-box"><h2>الدعم والتذاكر</h2><div class="form-grid"><div class="field"><label>عنوان التذكرة</label><input id="ticketSubject" placeholder="كيف يمكننا مساعدتك؟"></div><div class="field"><label>رقم الطلب (اختياري)</label><input id="ticketOrder" placeholder="#1001"></div><div class="field full"><label>التفاصيل</label><textarea id="ticketMessage" rows="4" placeholder="اكتب رسالتك…"></textarea></div></div><div class="form-actions"><button class="btn primary" id="createTicket">إرسال التذكرة</button></div></div>
-      <div class="section-box"><h3>تذاكري</h3>${store.tickets.length?store.tickets.map(t=>`<p>${escapeHtml(t.subject)} <span class="pill pending">قيد المراجعة</span></p>`).join(""):'<div class="empty">لا توجد تذاكر بعد.</div>'}</div>`;
-    if(panel==="offers") content.innerHTML=`<div class="section-box"><h2>العروض المجانية</h2><p style="color:var(--muted)">تحقق من العروض المتاحة واستفد منها.</p><div class="grid-2"><div class="section-box"><span class="badge">عرض جديد</span><h3>هدية للمستخدمين الجدد</h3><p style="color:var(--muted);font-size:12px">تفعيل المكافأة يتم عبر إعدادات المتجر.</p><button class="btn primary" id="claimBonus">استلام الهدية</button></div><div class="section-box"><span class="badge">مجاني</span><h3>العروض الموسمية</h3><p style="color:var(--muted);font-size:12px">لا توجد عروض إضافية الآن.</p></div></div></div>`;
-    if(panel==="api") content.innerHTML=`<div class="section-box"><h2>توثيق API</h2><p style="color:var(--muted)">مساحة توثيق واجهة برمجة التطبيقات — أضف تفاصيل نقاط النهاية عند تجهيز backend.</p><h3>مثال الطلب</h3><pre style="direction:ltr;text-align:left;overflow:auto;padding:16px;border-radius:12px;background:rgba(0,0,0,.24);color:#b8d8ff">GET /api/v1/products
-Authorization: Bearer YOUR_API_KEY</pre><p class="modal-foot">لا تضع مفاتيح API السرية في كود الواجهة الأمامية.</p></div>`;
-    if(panel==="settings") content.innerHTML=`<div class="section-box"><h2>المظهر والإعدادات</h2><p style="color:var(--muted)">اختر لون الواجهة من 40 لوناً، وبدّل بين الوضعين.</p><div class="color-grid">${icons.map(c=>`<button class="color-dot ${getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()===c?"selected":""}" style="background:${c}" data-color="${c}" aria-label="لون ${c}"></button>`).join("")}</div><div class="form-actions"><button class="btn" id="dashTheme">تبديل الوضع الفاتح/الداكن</button><button class="btn" id="dashLang">العربية / English</button></div></div>`;
-    if(panel==="admin-products") content.innerHTML=`
+    const payBtn = $("#usdtPayBtn");
+    if (payBtn) payBtn.onclick = async () => {
+      const amount = Number($("#usdtAmount").value);
+      if (!amount || amount < 1) return toast("أدخل مبلغاً صحيحاً");
+      try {
+        const r = await apiPost("/api/payment/cryptomus/create", { amount });
+        $("#usdtResult").innerHTML = r.payUrl ? `<a class="btn primary" href="${escapeHtml(r.payUrl)}" target="_blank">إتمام الدفع</a>` : `<p>${escapeHtml(r.message || "تم إنشاء الفاتورة")}</p>`;
+      } catch (e) { toast("تعذر إنشاء الفاتورة — تحقق من إعدادات Cryptomus"); }
+    };
+  }
+
+  if (panel === "codes") {
+    content.innerHTML = `<div class="section-box"><h2>استبدال كود رصيد</h2><p style="color:var(--muted);font-size:12px">أدخل كود الهدية أو الرصيد.</p><div class="toolbar"><input id="redeemCode" placeholder="مثال: NP-ABC123"><button class="btn primary" id="redeemBtn">استبدال</button></div></div>`;
+    $("#redeemBtn").onclick = async () => {
+      const code = $("#redeemCode").value.trim().toUpperCase();
+      if (!code) return toast("أدخل الكود");
+      try {
+        const r = await apiPost("/api/balance/redeem", { code });
+        await refreshProfile(); renderPanel("codes");
+        toast("تمت إضافة " + money(r.amount) + " إلى رصيدك");
+      } catch (e) { toast(e.error === "bad_code" ? "الكود غير صالح أو مستخدم" : "خطأ في الاستبدال"); }
+    };
+  }
+
+  if (panel === "tickets") {
+    content.innerHTML = `
+      <div class="section-box"><h2>الدعم والتذاكر</h2>
+        <div class="form-grid">
+          <div class="field"><label>عنوان التذكرة</label><input id="ticketSubject" placeholder="كيف يمكننا مساعدتك؟"></div>
+          <div class="field full"><label>التفاصيل</label><textarea id="ticketMessage" rows="4" placeholder="اكتب رسالتك…"></textarea></div>
+        </div>
+        <div class="form-actions"><button class="btn primary" id="createTicket">إرسال التذكرة</button></div>
+      </div>
+      <div class="section-box"><h3>تذاكري</h3><div id="myTickets"><div class="empty">جارٍ التحميل…</div></div></div>`;
+    const loadTickets = async () => {
+      try {
+        const d = await apiGet("/api/tickets");
+        const ts = d.tickets || [];
+        $("#myTickets").innerHTML = ts.length ? ts.map(t => `<div style="margin-bottom:10px"><b>${escapeHtml(t.subject)}</b> <span class="pill ${t.status === "open" ? "pending" : ""}">${escapeHtml(t.status)}</span><p style="color:var(--muted);font-size:12px">${escapeHtml(t.message)}</p>${t.admin_reply ? `<p style="font-size:12px"><b>رد الإدارة:</b> ${escapeHtml(t.admin_reply)}</p>` : ""}</div>`).join("") : '<div class="empty">لا توجد تذاكر بعد.</div>';
+      } catch (e) { $("#myTickets").innerHTML = '<div class="empty">تعذر التحميل.</div>'; }
+    };
+    await loadTickets();
+    $("#createTicket").onclick = async () => {
+      const subject = $("#ticketSubject").value.trim(), message = $("#ticketMessage").value.trim();
+      if (!subject || !message) return toast("أكمل عنوان التذكرة والتفاصيل");
+      try { await apiPost("/api/tickets", { subject, message }); await loadTickets(); toast("تم إرسال التذكرة"); }
+      catch (e) { toast("خطأ في إرسال التذكرة"); }
+    };
+  }
+
+  if (panel === "offers") {
+    let freebies = [];
+    try { const d = await apiGet("/api/products"); freebies = (d.products || []).filter(p => Number(p.is_free)); } catch (e) {}
+    content.innerHTML = `<div class="section-box"><h2>العروض المجانية</h2>
+      ${freebies.length ? `<div class="grid-2">` + freebies.map(p => `<div class="section-box"><span class="badge">مجاني</span><h3>${escapeHtml(p.name)}</h3><p style="color:var(--muted);font-size:12px">${escapeHtml(p.description || "")}</p><button class="btn primary" data-freebuy="${p.id}">احصل مجاناً</button></div>`).join("") + `</div>` : '<div class="empty">لا توجد عروض مجانية الآن.</div>'}
+    </div>`;
+    $$("[data-freebuy]").forEach(b => b.onclick = () => buyProduct(b.dataset.freebuy));
+  }
+
+  if (panel === "api") {
+    content.innerHTML = `<div class="section-box"><h2>توثيق API</h2>
+      <p style="color:var(--muted)">نقاط النهاية العامة:</p>
+      <pre dir="ltr" style="text-align:left;overflow:auto;padding:16px;border-radius:12px;background:rgba(0,0,0,.24);color:#b8d8ff">GET /api/products
+GET /api/products/:category
+GET /api/products/:category/:subcategory
+POST /api/auth/register
+POST /api/auth/verify-otp
+POST /api/auth/login
+POST /api/auth/login-otp</pre></div>`;
+  }
+
+  if (panel === "settings") {
+    const icons = ["#8e6bff","#41b6ff","#ff6b9e","#ff9955","#44d7b6","#e9ba48","#ae6cff","#47a9ff","#ff5680","#8dd85b","#cf71ff","#44d6e8","#f27764","#6680ff","#ed71b4","#73c9ff","#b4d544","#ffb45c","#7970ff","#54cf94","#e66bff","#5fcbff","#ff7481","#92bc49","#a18aff","#41a3e2","#ee9bcb","#67c9a0","#f9cb4b","#cb75f0","#448eff","#ff8265","#63dbd2","#aa6bff","#ff609f","#8daeff","#c7a93e","#5dcbff","#da7c63","#60bf84"];
+    content.innerHTML = `<div class="section-box"><h2>المظهر والإعدادات</h2><p style="color:var(--muted)">اختر لون الواجهة من 40 لوناً، وبدّل بين الوضعين.</p>
+      <div class="color-grid">${icons.map(c => `<button class="color-dot" style="background:${c}" data-color="${c}" aria-label="لون"></button>`).join("")}</div>
+      <div class="form-actions"><button class="btn" id="dashTheme">تبديل الوضع الفاتح/الداكن</button><button class="btn" id="dashLang">العربية / English</button></div></div>`;
+    $$(".color-dot").forEach(b => b.onclick = () => {
+      document.documentElement.style.setProperty("--accent", b.dataset.color);
+      $$(".color-dot").forEach(x => x.classList.remove("selected")); b.classList.add("selected");
+      localStorage.setItem("np_accent", b.dataset.color);
+    });
+    $("#dashTheme").onclick = toggleTheme;
+    $("#dashLang").onclick = toggleLanguage;
+  }
+
+  // ---------- Admin panels ----------
+  if (panel === "admin-products") {
+    content.innerHTML = `
       <div class="section-box"><h2>إضافة منتج</h2><form id="productForm" class="form-grid">
         <div class="field"><label>اسم المنتج</label><input name="name" required></div>
         <div class="field"><label>السعر بالدولار (0.05–10000)</label><input name="price" type="number" min=".05" max="10000" step=".01" required></div>
         <div class="field"><label>الكمية المتاحة</label><input name="stock" type="number" min="0" value="10" required></div>
-        <div class="field"><label>الحد الأقصى لكل مستخدم</label><input name="max" type="number" min="1" value="1" required></div>
+        <div class="field"><label>الحد الأقصى لكل مستخدم</label><input name="max_per_user" type="number" min="0" value="1"></div>
         <div class="field"><label>التصنيف</label><select name="category"><option value="whatsapp">واتساب</option><option value="telegram">تيليجرام</option><option value="instagram">إنستغرام</option></select></div>
-        <div class="field"><label>التصنيف الفرعي</label><input name="sub" placeholder="أرقام / خدمات"></div>
-        <div class="field"><label>رابط اختياري</label><input name="link" type="url" placeholder="https://"></div>
-        <div class="field"><label>رقم اختياري</label><input name="number" placeholder="+000…"></div>
-        <div class="field"><label>أيقونة / إيموجي المنتج</label><input name="icon" placeholder="📦"></div>
-        <div class="field"><label>رابط شعار المنتج (اختياري)</label><input name="logo" type="url" placeholder="https://"></div>
-        <div class="field full"><label>وصف المنتج</label><textarea name="desc" rows="2"></textarea></div>
-        <div class="field full"><button class="btn primary">إضافة المنتج</button></div></form></div>
-      <div class="section-box"><h3>المنتجات الحالية</h3><div class="table-wrap"><table><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>المخزون</th><th>إجراء</th></tr></thead><tbody>${store.products.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${categoryNames[p.category]}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="btn danger" data-delete="${p.id}">حذف</button></td></tr>`).join("")}</tbody></table></div></div>`;
-    if(panel==="admin-users") content.innerHTML=`<div class="section-box"><h2>إدارة المستخدمين</h2><div class="field"><label>البحث بمعرف العميل أو البريد أو اسم المستخدم</label><input id="userSearch" placeholder="ابحث عن مستخدم…"></div><div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>العميل</th><th>المعرف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="userRows"></tbody></table></div><p class="modal-foot">حظر IP والحساب وإعادة تعيين الرصيد تتطلب نظام مصادقة وقاعدة بيانات على الخادم.</p></div>`;
-    if(panel==="admin-settings") content.innerHTML=`
-      <div class="section-box"><h2>طرق الدفع وإعدادات الدعم</h2><div class="form-grid">
-        <div class="field"><label>رقم حساب Zain Cash</label><input id="zainAccount" placeholder="أدخل رقم الحساب"></div>
-        <div class="field"><label>رقم حساب Asia Hawala</label><input id="asiaAccount" placeholder="أدخل رقم الحساب"></div>
-        <div class="field"><label>بريد الدعم</label><input id="supportEmail" type="email" placeholder="support@example.com"></div>
-        <div class="field"><label>معرف دعم / رابط</label><input id="supportLink" placeholder="رابط التواصل"></div>
-        <div class="field full"><button class="btn primary" id="saveSettings">حفظ الإعدادات محلياً</button></div>
-      </div></div>
-      <div class="section-box"><h2>إنشاء كود رصيد</h2><div class="toolbar"><input id="codeAmount" type="number" min=".05" step=".01" placeholder="قيمة الكود بالدولار"><input id="codeCount" type="number" min="1" value="1" placeholder="العدد"><button class="btn primary" id="generateCodes">توليد</button></div><div id="generatedCodes" style="margin-top:14px;color:var(--muted);font-size:12px"></div></div>
-      <div class="section-box"><h2>إرسال إشعار / بريد جماعي</h2><div class="field"><label>الرسالة</label><textarea id="broadcastText" rows="3" placeholder="اكتب إشعار المتجر…"></textarea></div><button class="btn" id="broadcastBtn">إرسال تجريبي</button></div>`;
-    wirePanel(panel);
-  }
-  function ordersTable() {
-    if(!store.orders.length) return '<div class="empty">لا توجد طلبات حالياً.</div>';
-    return `<div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>تسليم / إجراء</th></tr></thead><tbody>${store.orders.map((o,i)=>`<tr><td>#${o.id}</td><td>${escapeHtml(o.name)}</td><td>${money(o.price)}</td><td><span class="pill ${o.status==="مكتمل"?"":"pending"}">${o.status}</span></td><td>${store.isAdmin&&o.status!=="مكتمل"?`<button class="btn" data-deliver="${i}">تأكيد التسليم</button>`:escapeHtml(o.delivery||"—")}</td></tr>`).join("")}</tbody></table></div>`;
-  }
-  function wirePanel(panel) {
-    if(panel==="admin-products") {
-      $("#productForm").onsubmit=e=>{e.preventDefault(); const d=Object.fromEntries(new FormData(e.currentTarget));
-        const price=Number(d.price); if(price<.05||price>10000) return toast("السعر يجب أن يكون بين $0.05 و$10,000");
-        store.products.unshift({id:Date.now(),...d,price,stock:Number(d.stock),max:Number(d.max),icon:d.icon||"📦",desc:d.desc||"خدمة رقمية"});
-        renderPanel("admin-products");renderProducts(store.route);toast("تمت إضافة المنتج");};
-      $$("[data-delete]").forEach(b=>b.onclick=()=>{store.products=store.products.filter(p=>p.id!=b.dataset.delete);renderPanel(panel);renderProducts(store.route);toast("تم حذف المنتج");});
-    }
-    if(panel==="admin-users") {
-      const draw=()=>$("#userRows").innerHTML=store.users.filter(u=>JSON.stringify(u).toLowerCase().includes(($("#userSearch").value||"").toLowerCase())).map((u,i)=>`<tr><td>${escapeHtml(u.name||u.username||"مستخدم")}</td><td>${u.id}</td><td><span class="pill ${u.banned?"banned":""}">${u.banned?"محظور":"نشط"}</span></td><td><button class="btn ${u.banned?"":"danger"}" data-ban="${i}">${u.banned?"إلغاء الحظر":"حظر الحساب"}</button></td></tr>`).join("") || '<tr><td colspan="4">لا يوجد مستخدمون بعد.</td></tr>');
-      draw();$("#userSearch").oninput=draw;$("#userRows").onclick=e=>{const b=e.target.closest("[data-ban]");if(!b)return;const u=store.users[b.dataset.ban];u.banned=!u.banned;persist();draw();};
-    }
-    if(panel==="admin-settings") {
-      $("#generateCodes").onclick=()=>{const amount=Number($("#codeAmount").value),count=Math.min(100,Number($("#codeCount").value)||1);if(amount<.05)return toast("أدخل قيمة صحيحة");
-        const made=Array.from({length:count},()=>({code:"NP-"+Math.random().toString(36).slice(2,8).toUpperCase(),amount,used:false}));
-        store.codes.push(...made);persist();$("#generatedCodes").innerHTML=made.map(c=>`<div>${c.code} — ${money(c.amount)}</div>`).join("");toast("تم إنشاء الأكواد التجريبية");};
-      $("#saveSettings").onclick=()=>{localStorage.setItem("np_payment_settings",JSON.stringify({zain:$("#zainAccount").value,asia:$("#asiaAccount").value,support:$("#supportEmail").value,link:$("#supportLink").value}));toast("تم الحفظ على هذا الجهاز");};
-      $("#broadcastBtn").onclick=()=>toast($("#broadcastText").value?"تم تسجيل الإشعار التجريبي":"اكتب رسالة أولاً");
-    }
-    if(panel==="codes") $("#redeemBtn").onclick=()=>{const code=$("#redeemCode").value.trim().toUpperCase();const item=store.codes.find(c=>c.code===code&&!c.used);if(!item)return toast("الكود غير صالح أو مستخدم");
-      item.used=true;store.balance+=item.amount;persist();renderPanel("codes");toast("تمت إضافة "+money(item.amount)+" إلى رصيدك");};
-    if(panel==="tickets") $("#createTicket").onclick=()=>{const subject=$("#ticketSubject").value.trim(),message=$("#ticketMessage").value.trim();if(!subject||!message)return toast("أكمل عنوان التذكرة والتفاصيل");
-      store.tickets.unshift({subject,message,date:new Date().toISOString()});persist();renderPanel("tickets");toast("تم إرسال التذكرة");};
-    if(panel==="offers") $("#claimBonus").onclick=()=>toast("إعداد مكافأة المستخدم الجديد يحتاج تفعيلها من الخادم");
-    if(panel==="settings") {
-      $$(".color-dot").forEach(b=>b.onclick=()=>{document.documentElement.style.setProperty("--accent",b.dataset.color);$$(".color-dot").forEach(x=>x.classList.remove("selected"));b.classList.add("selected");localStorage.setItem("np_accent",b.dataset.color);});
-      $("#dashTheme").onclick=toggleTheme;$("#dashLang").onclick=toggleLanguage;
-    }
-    $$("[data-jump]").forEach(b=>b.onclick=()=>renderPanel(b.dataset.jump));
-    $$("[data-deliver]").forEach(b=>b.onclick=()=>{const o=store.orders[b.dataset.deliver];o.status="مكتمل";o.delivery="تم التسليم";persist();renderPanel(panel);toast("تم تحديث حالة الطلب");});
-    $$("[data-pay]").forEach(b=>b.onclick=()=>toast(b.dataset.pay==="cryptomus"?"الدفع يتطلب ربط Cryptomus API بالخادم":"أضف تعليمات الحساب من إعدادات لوحة الإدارة"));
-  }
-  function toggleTheme() {
-    document.body.classList.toggle("light");localStorage.setItem("np_theme",document.body.classList.contains("light")?"light":"dark");
-  }
-  function toggleLanguage() {
-    store.lang=store.lang==="ar"?"en":"ar";
-    document.documentElement.lang=store.lang;document.documentElement.dir=store.lang==="ar"?"rtl":"ltr";
-    $("#languageBtn").textContent=store.lang==="ar"?"EN":"ع";
-    $$("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;el.textContent=store.lang==="ar"?({
-      home:"الرئيسية",telegram:"تيليجرام",whatsapp:"واتساب",instagram:"إنستغرام",offers:"العروض",api:"API",admin:"الإدارة",login:"دخول",
-      heroEyebrow:"متجرك الرقمي الموثوق",heroLine1:"حلول رقمية",heroLine2:"بخطوات بسيطة",heroText:"أرقام وخدمات رقمية متنوعة، تسليم سريع، وتجربة شراء سهلة وآمنة من مكان واحد.",
-      browse:"تصفح المنتجات",addBalance:"إضافة رصيد",availableProducts:"منتجات متاحة",support:"دعم متواصل",fastDelivery:"تسليم سريع",
-      categories:"التصنيفات",categoriesSub:"اختر الخدمة المناسبة لك",numbers:"أرقام وخدمات",services:"خدمات رقمية",freeOffers:"عروض مجانية",
-      featured:"منتجات مميزة",productsSub:"خيارات مختارة من NumberPlus",footer:"متجر الخدمات الرقمية"
-    })[key]:translations.en[key]||el.textContent;});
-    renderProducts(store.route);
-  }
-  function buyProduct(id) {
-    const p=store.products.find(x=>x.id==id); if(!p)return;
-    if(!store.currentUser) return loginModal();
-    if(p.stock<=0)return toast("المنتج غير متوفر حالياً");
-    if(store.balance<p.price) return toast("رصيدك غير كافٍ — أضف رصيداً أولاً");
-    store.balance-=p.price;p.stock--;
-    store.orders.unshift({id:String(Date.now()).slice(-7),name:p.name,price:p.price,status:"قيد التجهيز",delivery:""});
-    persist();renderProducts(store.route);toast("تم إنشاء الطلب التجريبي");
+        <div class="field"><label>التصنيف الفرعي</label><input name="subcategory" placeholder="أرقام / خدمات"></div>
+        <div class="field"><label>رابط شعار المنتج (اختياري)</label><input name="logo_url" type="url" placeholder="https://"></div>
+        <div class="field"><label>وصف المنتج</label><input name="description"></div>
+        <div class="field"><label><input type="checkbox" name="requires_link" style="width:auto"> يتطلب رابط من العميل</label></div>
+        <div class="field"><label><input type="checkbox" name="requires_number" style="width:auto"> يتطلب رقم من العميل</label></div>
+        <div class="field"><label><input type="checkbox" name="is_free" style="width:auto"> عرض مجاني</label></div>
+        <div class="field full"><button class="btn primary">إضافة المنتج</button></div>
+      </form></div>
+      <div class="section-box"><h3>المنتجات الحالية</h3><div id="adminProductList"><div class="empty">جارٍ التحميل…</div></div></div>`;
+    const loadAdminProducts = async () => {
+      try {
+        const d = await apiGet("/api/admin/products");
+        const ps = d.products || [];
+        $("#adminProductList").innerHTML = ps.length ? `<div class="table-wrap"><table><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>المخزون</th><th>إجراء</th></tr></thead><tbody>${ps.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="btn danger" data-adel="${p.id}">حذف</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد منتجات.</div>';
+        $$("[data-adel]").forEach(b => b.onclick = async () => {
+          if (!confirm("حذف هذا المنتج؟")) return;
+          await apiDel("/api/admin/products/" + b.dataset.adel);
+          await loadAdminProducts(); await loadProducts(); toast("تم حذف المنتج");
+        });
+      } catch (e) { $("#adminProductList").innerHTML = '<div class="empty">تعذر التحميل.</div>'; }
+    };
+    await loadAdminProducts();
+    $("#productForm").onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.currentTarget));
+      const price = Number(d.price);
+      if (price < .05 || price > 10000) return toast("السعر يجب أن يكون بين $0.05 و$10,000");
+      try {
+        await apiPost("/api/admin/products", {
+          name: d.name, price, stock: Number(d.stock) || 0, max_per_user: Number(d.max_per_user) || 0,
+          category: d.category, subcategory: d.subcategory || null, logo_url: d.logo_url || null,
+          description: d.description || null, requires_link: !!d.requires_link, requires_number: !!d.requires_number, is_free: !!d.is_free
+        });
+        await loadAdminProducts(); await loadProducts(); toast("تمت إضافة المنتج");
+        e.target.reset();
+      } catch (err) { toast("خطأ في إضافة المنتج"); }
+    };
   }
 
-  document.addEventListener("click",e=>{
-    const route=e.target.closest("[data-route]");
-    if(route){e.preventDefault();setRoute(route.dataset.route);return;}
-    const view=e.target.closest("[data-view]");
-    if(view){showDashboard(view.dataset.view);return;}
-    const buy=e.target.closest("[data-buy]");if(buy)buyProduct(buy.dataset.buy);
-    const panel=e.target.closest("[data-panel]");if(panel)showDashboard(panel.dataset.panel);
-  });
-  $("#searchInput").addEventListener("input",()=>renderProducts(store.route));
-  $("#loginBtn").onclick=()=>store.currentUser?showDashboard("overview"):loginModal();
-  $("#adminShortcut").onclick=()=>{store.isAdmin=!store.isAdmin;if(store.isAdmin){store.currentUser=store.currentUser||{name:"مدير المتجر",id:"ADMIN"};showDashboard("overview");toast("وضع الإدارة التجريبي");}else setRoute("/");};
-  $("#closeModal").onclick=closeModal;
-  $("#modalBackdrop").onclick=e=>{if(e.target.id==="modalBackdrop")closeModal();};
-  $("#languageBtn").onclick=toggleLanguage;
-  $("#themeBtn").onclick=toggleTheme;
-  $("#logoutBtn").onclick=()=>{store.currentUser=null;store.isAdmin=false;sessionStorage.removeItem("np_user");setRoute("/");toast("تم تسجيل الخروج");};
-  window.addEventListener("popstate",()=>setRoute(location.pathname,false));
-  document.documentElement.style.setProperty("--accent",localStorage.getItem("np_accent")||"#8e6bff");
-  if(localStorage.getItem("np_theme")==="light")document.body.classList.add("light");
-  $("#year").textContent=new Date().getFullYear();
-  setRoute(location.pathname,false);
+  if (panel === "admin-orders") {
+    content.innerHTML = `<div class="section-box"><h2>إدارة الطلبات</h2><div id="adminOrdersWrap"><div class="empty">جارٍ التحميل…</div></div></div>`;
+    const loadAO = async () => {
+      try {
+        const d = await apiGet("/api/admin/orders");
+        const os = d.orders || [];
+        $("#adminOrdersWrap").innerHTML = os.length ? `<div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${os.map(o => `<tr><td>${escapeHtml(o.order_number)}</td><td>${escapeHtml(o.email || "")}<br><small>${escapeHtml(o.whatsapp || "")}</small></td><td>${escapeHtml(o.product_name || "")}</td><td>${money(o.total_price)}</td><td>${escapeHtml(o.status)}</td><td>${o.status !== "completed" && o.status !== "cancelled" ? `<button class="btn" data-odone="${o.id}">تسليم</button> <button class="btn danger" data-ocancel="${o.id}">إلغاء</button>` : "—"}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">لا توجد طلبات.</div>';
+        $$("[data-odone]").forEach(b => b.onclick = async () => { await apiPost("/api/admin/orders/" + b.dataset.odone + "/deliver", {}); await loadAO(); toast("تم التسليم"); });
+        $$("[data-ocancel]").forEach(b => b.onclick = async () => { await apiPost("/api/admin/orders/" + b.dataset.ocancel + "/cancel", {}); await loadAO(); toast("تم الإلغاء"); });
+      } catch (e) { $("#adminOrdersWrap").innerHTML = '<div class="empty">تعذر التحميل.</div>'; }
+    };
+    await loadAO();
+  }
+
+  if (panel === "admin-users") {
+    content.innerHTML = `<div class="section-box"><h2>إدارة المستخدمين</h2>
+      <div class="field"><label>البحث بمعرف العميل أو البريد أو اسم المستخدم</label><input id="userSearch" placeholder="ابحث عن مستخدم…"></div>
+      <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>العميل</th><th>المعرف</th><th>الرصيد</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="userRows"><tr><td colspan="5">جارٍ التحميل…</td></tr></tbody></table></div></div>`;
+    let allUsers = [];
+    const draw = () => {
+      const q = ($("#userSearch").value || "").toLowerCase();
+      const list = allUsers.filter(u => JSON.stringify(u).toLowerCase().includes(q));
+      $("#userRows").innerHTML = list.map(u => `<tr><td>${escapeHtml(u.full_name || u.username)}<br><small>${escapeHtml(u.email)}</small></td><td>${escapeHtml(u.customer_id || "")}</td><td>${money(u.balance)}</td><td><span class="pill ${u.banned ? "banned" : ""}">${u.banned ? "محظور" : "نشط"}</span></td><td><button class="btn ${u.banned ? "" : "danger"}" data-uban="${u.id}" data-b="${u.banned}">${u.banned ? "إلغاء الحظر" : "حظر"}</button> <button class="btn" data-uzero="${u.id}">تصفير الرصيد</button></td></tr>`).join("") || '<tr><td colspan="5">لا يوجد مستخدمون.</td></tr>';
+      $$("[data-uban]").forEach(b => b.onclick = async () => {
+        await apiPost(`/api/admin/users/${b.dataset.uban}/${b.dataset.b === "1" ? "unban" : "ban"}`, {});
+        allUsers = (await apiGet("/api/admin/users")).users || []; draw(); toast("تم التحديث");
+      });
+      $$("[data-uzero]").forEach(b => b.onclick = async () => {
+        if (!confirm("تصفير رصيد هذا المستخدم؟")) return;
+        await apiPost(`/api/admin/users/${b.dataset.uzero}/reset-balance`, {}); 
+        allUsers = (await apiGet("/api/admin/users")).users || []; draw(); toast("تم تصفير الرصيد");
+      });
+    };
+    try { allUsers = (await apiGet("/api/admin/users")).users || []; } catch (e) {}
+    draw();
+    $("#userSearch").oninput = draw;
+  }
+
+  if (panel === "admin-settings") {
+    content.innerHTML = `
+      <div class="section-box"><h2>إعدادات الدعم</h2><div id="settingsWrap"><div class="empty">جارٍ التحميل…</div></div></div>
+      <div class="section-box"><h2>إنشاء أكواد رصيد</h2>
+        <div class="toolbar"><input id="codeAmount" type="number" min=".05" step=".01" placeholder="قيمة الكود"><input id="codeCount" type="number" min="1" value="1" placeholder="العدد"><button class="btn primary" id="generateCodes">توليد</button></div>
+        <div id="generatedCodes" style="margin-top:14px"></div></div>
+      <div class="section-box"><h2>إشعار / بريد جماعي</h2>
+        <div class="field"><label>عنوان الإشعار</label><input id="notifTitle" placeholder="عنوان"></div>
+        <div class="field"><label>الرسالة</label><textarea id="broadcastText" rows="3"></textarea></div>
+        <div class="form-actions"><button class="btn" id="notifBtn">إرسال إشعار للجميع</button><button class="btn" id="emailBtn">إرسال بريد للجميع</button></div></div>`;
+    try {
+      const d = await apiGet("/api/admin/settings");
+      const s = d.settings || {};
+      $("#settingsWrap").innerHTML = `<div class="form-grid">
+        <div class="field"><label>بريد الدعم</label><input id="setEmail" value="${escapeHtml(s.support_email || "")}"></div>
+        <div class="field"><label>واتساب الدعم</label><input id="setWa" value="${escapeHtml(s.support_whatsapp || "")}"></div>
+        <div class="field"><label>تيليجرام الدعم</label><input id="setTg" value="${escapeHtml(s.support_telegram || "")}"></div>
+        <div class="field full"><button class="btn primary" id="saveSettingsBtn">حفظ الإعدادات</button></div></div>`;
+      $("#saveSettingsBtn").onclick = async () => {
+        await apiPut("/api/admin/settings", { support_email: $("#setEmail").value, support_whatsapp: $("#setWa").value, support_telegram: $("#setTg").value });
+        toast("تم حفظ الإعدادات");
+      };
+    } catch (e) { $("#settingsWrap").innerHTML = '<div class="empty">تعذر التحميل.</div>'; }
+    $("#generateCodes").onclick = async () => {
+      const amount = Number($("#codeAmount").value), count = Math.min(100, Number($("#codeCount").value) || 1);
+      if (!amount || amount < .05) return toast("أدخل قيمة صحيحة");
+      try {
+        const r = await apiPost("/api/admin/balance-codes", { amount, count });
+        $("#generatedCodes").innerHTML = (r.codes || []).map(c => `<div dir="ltr">${escapeHtml(c.code)} — ${money(c.amount)}</div>`).join("");
+        toast("تم إنشاء الأكواد");
+      } catch (e) { toast("خطأ في إنشاء الأكواد"); }
+    };
+    $("#notifBtn").onclick = async () => {
+      const title = $("#notifTitle").value.trim(), message = $("#broadcastText").value.trim();
+      if (!message) return toast("اكتب رسالة أولاً");
+      await apiPost("/api/admin/notifications", { title: title || "إشعار", message });
+      toast("تم إرسال الإشعار");
+    };
+    $("#emailBtn").onclick = async () => {
+      const message = $("#broadcastText").value.trim();
+      if (!message) return toast("اكتب رسالة أولاً");
+      if (!confirm("إرسال بريد لجميع المستخدمين؟")) return;
+      await apiPost("/api/admin/email-broadcast", { subject: $("#notifTitle").value || "NumberPlus", message });
+      toast("تم إرسال البريد");
+    };
+  }
+
+  // wire jump buttons
+  $$("[data-jump]").forEach(b => b.onclick = () => renderPanel(b.dataset.jump));
+}
+
+// ---------- Buy flow ----------
+async function buyProduct(id) {
+  const p = store.products.find(x => x.id == id);
+  if (!p) return;
+  if (!store.currentUser) return loginModal();
+  if (p.stock <= 0 && !Number(p.is_free)) return toast("المنتج غير متوفر حالياً");
+  let linkValue = null, numberValue = null;
+  if (Number(p.requires_link) || Number(p.requires_number)) {
+    openModal("إتمام الطلب", `
+      <form id="buyForm">
+        ${Number(p.requires_link) ? `<div class="field"><label>الرابط المطلوب</label><input name="linkValue" type="url" required placeholder="https://"></div>` : ""}
+        ${Number(p.requires_number) ? `<div class="field"><label>الرقم المطلوب</label><input name="numberValue" required placeholder="+..."></div>` : ""}
+        <button class="btn primary" style="width:100%">تأكيد الطلب · ${money(p.price)}</button>
+      </form>`);
+    $("#buyForm").onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.currentTarget));
+      await doBuy(p.id, 1, d.linkValue || null, d.numberValue || null);
+    };
+    return;
+  }
+  await doBuy(p.id, 1, null, null);
+}
+
+async function doBuy(productId, quantity, linkValue, numberValue) {
+  try {
+    const r = await apiPost("/api/orders", { productId, quantity, linkValue, numberValue });
+    closeModal();
+    await refreshProfile(); await loadProducts();
+    toast("تم إنشاء الطلب " + (r.orderNumber || ""));
+    showDashboard("orders");
+  } catch (e) {
+    toast(e.error === "insufficient_balance" ? "رصيدك غير كافٍ — أضف رصيداً أولاً" : e.error === "out_of_stock" ? "المنتج غير متوفر" : "خطأ في إنشاء الطلب");
+  }
+}
+
+// ---------- Theme & Language ----------
+function toggleTheme() {
+  document.body.classList.toggle("light");
+  localStorage.setItem("np_theme", document.body.classList.contains("light") ? "light" : "dark");
+}
+function toggleLanguage() {
+  store.lang = store.lang === "ar" ? "en" : "ar";
+  localStorage.setItem("np_lang", store.lang);
+  document.documentElement.lang = store.lang;
+  document.documentElement.dir = store.lang === "ar" ? "rtl" : "ltr";
+  $("#languageBtn").textContent = store.lang === "ar" ? "EN" : "ع";
+  renderProducts(store.route);
+}
+
+// ---------- Init ----------
+document.addEventListener("click", e => {
+  const route = e.target.closest("[data-route]");
+  if (route) { e.preventDefault(); setRoute(route.dataset.route); return; }
+  const view = e.target.closest("[data-view]");
+  if (view) { store.currentUser ? showDashboard(view.dataset.view) : loginModal(); return; }
+  const buy = e.target.closest("[data-buy]");
+  if (buy) { buyProduct(buy.dataset.buy); return; }
+  const panel = e.target.closest("[data-panel]");
+  if (panel) { store.currentUser ? showDashboard(panel.dataset.panel) : loginModal(); return; }
+});
+document.addEventListener("DOMContentLoaded", async () => {
+  const searchInput = $("#searchInput");
+  if (searchInput) searchInput.addEventListener("input", () => renderProducts(store.route));
+  $("#loginBtn").onclick = () => store.currentUser ? showDashboard("overview") : loginModal();
+  $("#closeModal").onclick = closeModal;
+  $("#modalBackdrop").onclick = e => { if (e.target.id === "modalBackdrop") closeModal(); };
+  $("#languageBtn").onclick = toggleLanguage;
+  $("#themeBtn").onclick = toggleTheme;
+  const logoutBtn = $("#logoutBtn");
+  if (logoutBtn) logoutBtn.onclick = logout;
+  // Hide public admin shortcut — admin is role-based only
+  const adminShortcut = $("#adminShortcut");
+  if (adminShortcut) adminShortcut.style.display = "none";
+  window.addEventListener("popstate", () => setRoute(location.pathname, false));
+
+  document.documentElement.style.setProperty("--accent", localStorage.getItem("np_accent") || "#8e6bff");
+  if (localStorage.getItem("np_theme") === "light") document.body.classList.add("light");
+  document.documentElement.lang = store.lang;
+  document.documentElement.dir = store.lang === "ar" ? "rtl" : "ltr";
+  $("#languageBtn").textContent = store.lang === "ar" ? "EN" : "ع";
+  const yearEl = $("#year");
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+  // Restore session
+  if (Token.get()) { await refreshProfile(); }
+  await loadProducts();
+  setRoute(location.pathname, false);
+});
 </script>
-</body>
-</html>
+</body></html>
