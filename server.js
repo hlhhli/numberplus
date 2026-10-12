@@ -967,6 +967,12 @@ app.get("*", (req, res) => {
   try {
     await initDb();
     console.log("[db] schema ready");
+    // Ensure all configured admin emails have admin role
+    for (const em of cfg.adminEmails) {
+      try {
+        await q("UPDATE users SET role='admin' WHERE LOWER(email)=?", [em]);
+      } catch (e) { console.error("[admin-promote]", e.message); }
+    }
   } catch (e) {
     console.error("[db] init failed:", e.message);
     process.exit(1);
