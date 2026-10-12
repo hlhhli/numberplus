@@ -558,6 +558,38 @@ app.post("/api/auth/login-otp", async (req, res) => {
   } catch (e) { console.error(e); return res.status(500).json({ error: "server_error" }); }
 });
 
+// Forgot password: send OTP
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email, lang } = req.body || {};
+    const em = String(email || "").trim().toLowerCase();
+    if (!em) return res.status(400).json({ error: "missing_fields" });
+    const users = await q("SELECT id, language FROM users WHERE email=?", [em]);
+    if (!users.length) return res.status(404).json({ error: "not_found" });
+    const code = genOtp();
+    await q("DELETE FROM otp_codes WHERE email=?", [em]);
+    await q("INSERT INTO otp_codes (email, code, expires_at) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 10 MINUTE))", [em, code]);
+    const sent = await sendOtpEmail(em, code, lang || users[0].language || "ar");
+    return res.json({ ok: true, emailSent: sent.ok });
+  } catch (e) { console.error(e); return res.status(500).json({ error: "server_error" }); }
+});
+
+// Reset password: verify OTP + set new password
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { email, otp, password } = req.body || {};
+    const em = String(email || "").trim().toLowerCase();
+    if (!em || !otp || !password) return res.status(400).json({ error: "missing_fields" });
+    if (String(password).length < 6) return res.status(400).json({ error: "password_short" });
+    const rows = await q("SELECT * FROM otp_codes WHERE email=? AND code=? AND used=0 AND expires_at > NOW() ORDER BY id DESC LIMIT 1", [em, String(otp).trim()]);
+    if (!rows.length) return res.status(400).json({ error: "bad_otp" });
+    await q("UPDATE otp_codes SET used=1 WHERE id=?", [rows[0].id]);
+    await q("UPDATE users SET password_hash=? WHERE email=?", [await bcrypt.hash(String(password), 10), em]);
+    await maybePromote(em);
+    return res.json({ ok: true });
+  } catch (e) { console.error(e); return res.status(500).json({ error: "server_error" }); }
+});
+
 // ---------- Products ----------
 app.get("/api/products", async (req, res) => {
   try {

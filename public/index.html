@@ -495,7 +495,10 @@ function loginModal() {
       <div class="field"><label>كلمة المرور</label><input name="password" type="password" required></div>
       <button class="btn primary" style="width:100%">دخول</button>
     </form>
-    <button class="btn ghost" style="width:100%;margin-top:10px" id="showSignup">إنشاء حساب جديد</button>`);
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn ghost" style="flex:1" id="showSignup">إنشاء حساب جديد</button>
+      <button class="btn ghost" style="flex:1" id="showForgot">نسيت كلمة السر</button>
+    </div>`);
   $("#loginForm").onsubmit = async e => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.currentTarget));
@@ -507,6 +510,47 @@ function loginModal() {
     }
   };
   $("#showSignup").onclick = signupModal;
+  $("#showForgot").onclick = forgotModal;
+}
+
+function forgotModal() {
+  openModal("نسيت كلمة السر", `
+    <form id="forgotForm">
+      <div class="field"><label>البريد الإلكتروني</label><input name="email" type="email" required placeholder="example@gmail.com"></div>
+      <button class="btn primary" style="width:100%">إرسال رمز التحقق</button>
+    </form>`);
+  $("#forgotForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      const r = await apiPost("/api/auth/forgot-password", { email: d.email, lang: store.lang });
+      closeModal(); resetModal(d.email);
+      toast(r.emailSent ? "تم إرسال رمز التحقق إلى بريدك" : "تعذر إرسال البريد");
+    } catch (err) {
+      toast(err.error === "not_found" ? "البريد غير مسجل" : "خطأ في الإرسال");
+    }
+  };
+}
+
+function resetModal(email) {
+  openModal("كلمة سر جديدة", `
+    <form id="resetForm">
+      <p style="color:var(--muted);font-size:13px">أدخل الرمز المرسل إلى ${escapeHtml(email)}</p>
+      <div class="field"><label>رمز OTP</label><input name="otp" inputmode="numeric" required placeholder="6 أرقام" maxlength="6"></div>
+      <div class="field"><label>كلمة السر الجديدة</label><input name="password" type="password" required minlength="6"></div>
+      <button class="btn primary" style="width:100%">تعيين كلمة السر</button>
+    </form>`);
+  $("#resetForm").onsubmit = async e => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.currentTarget));
+    try {
+      await apiPost("/api/auth/reset-password", { email, otp: d.otp, password: d.password });
+      closeModal(); loginModal();
+      toast("تم تعيين كلمة السر — سجل دخولك الآن");
+    } catch (err) {
+      toast(err.error === "bad_otp" ? "الرمز غير صحيح" : "خطأ في التعيين");
+    }
+  };
 }
 
 function loginOtpModal(email) {
