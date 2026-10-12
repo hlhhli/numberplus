@@ -34,16 +34,36 @@ const cfg = {
   cryptomusWebhookSecret: process.env.CRYPTOMUS_WEBHOOK_SECRET || "",
   signupBonus: parseFloat(process.env.SIGNUP_BONUS || "0"),
   signupBonusTarget: process.env.SIGNUP_BONUS_TARGET || "new",
-  db: {
-    host: process.env.DB_HOST || process.env.MYSQLHOST || "localhost",
-    port: parseInt(process.env.DB_PORT || process.env.MYSQLPORT || "3306", 10),
-    user: process.env.DB_USER || process.env.MYSQLUSER || "root",
-    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || "",
-    database: process.env.DB_NAME || process.env.MYSQLDATABASE || "numberplus",
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  },
+  db: (() => {
+    // Support DATABASE_URL (mysql://user:pass@host:port/db)
+    if (process.env.DATABASE_URL) {
+      try {
+        const u = new URL(process.env.DATABASE_URL);
+        return {
+          host: u.hostname,
+          port: parseInt(u.port || "3306", 10),
+          user: decodeURIComponent(u.username),
+          password: decodeURIComponent(u.password),
+          database: u.pathname.replace(/^\//, "") || "numberplus",
+          waitForConnections: true,
+          connectionLimit: 10,
+          queueLimit: 0,
+        };
+      } catch (e) {
+        console.error("Failed to parse DATABASE_URL:", e.message);
+      }
+    }
+    return {
+      host: process.env.DB_HOST || process.env.MYSQLHOST || "localhost",
+      port: parseInt(process.env.DB_PORT || process.env.MYSQLPORT || "3306", 10),
+      user: process.env.DB_USER || process.env.MYSQLUSER || "root",
+      password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || "",
+      database: process.env.DB_NAME || process.env.MYSQLDATABASE || "numberplus",
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    };
+  })(),
 };
 
 if (!cfg.jwtSecret) {
