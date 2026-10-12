@@ -301,6 +301,7 @@
       <button class="icon-btn" id="themeBtn" title="تبديل الوضع">☼</button>
       <button class="btn ghost optional" id="adminShortcut" data-i18n="admin">الإدارة</button>
       <button class="btn primary" id="loginBtn" data-i18n="login">دخول</button>
+      <button class="btn danger hidden" id="topLogoutBtn" title="تسجيل الخروج">خروج</button>
     </div>
   </header>
 
@@ -991,13 +992,16 @@ document.addEventListener("click", e => {
 });
 function updateAuthButton() {
   const btn = $("#loginBtn");
+  const logoutBtn = $("#topLogoutBtn");
   if (!btn) return;
   if (store.currentUser) {
     btn.textContent = "حسابي";
     btn.classList.remove("primary");
+    if (logoutBtn) logoutBtn.classList.remove("hidden");
   } else {
     btn.textContent = store.lang === "ar" ? "دخول" : "Sign in";
     btn.classList.add("primary");
+    if (logoutBtn) logoutBtn.classList.add("hidden");
   }
 }
 
@@ -1005,6 +1009,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchInput = $("#searchInput");
   if (searchInput) searchInput.addEventListener("input", () => renderProducts(store.route));
   $("#loginBtn").onclick = () => store.currentUser ? showDashboard("overview") : loginModal();
+  const topLogoutBtn = $("#topLogoutBtn");
+  if (topLogoutBtn) topLogoutBtn.onclick = logout;
   $("#closeModal").onclick = closeModal;
   $("#modalBackdrop").onclick = e => { if (e.target.id === "modalBackdrop") closeModal(); };
   $("#languageBtn").onclick = toggleLanguage;
