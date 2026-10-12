@@ -24,8 +24,8 @@ app.use(express.json({ limit: "2mb" }));
 const cfg = {
   port: parseInt(process.env.PORT || "8080", 10),
   jwtSecret: process.env.JWT_SECRET || "",
-  resendKey: process.env.RESEND_API_KEY || "",
-  resendFrom: process.env.RESEND_FROM || process.env.MAIL_FROM || "NumberPlus <info@numberplus.me>",
+  resendKey: process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD || "",
+  resendFrom: process.env.RESEND_FROM || process.env.MAIL_FROM || process.env.SMTP_FROM_EMAIL || "NumberPlus <info@numberplus.me>",
   adminEmails: (process.env.ADMIN_EMAILS ||
     "sajadem88@gmail.com,saladuu77@gmail.com,shhm98@gmail.com")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
@@ -282,9 +282,97 @@ CREATE TABLE IF NOT EXISTS transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `;
 
+async function columnExists(table, column) {
+  const rows = await q(
+    "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+    [table, column]
+  );
+  return Number(rows[0].c) > 0;
+}
+
+async function ensureColumn(table, column, definition) {
+  try {
+    if (!(await columnExists(table, column))) {
+      await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN ${definition}`);
+      console.log(`[migrate] added ${table}.${column}`);
+    }
+  } catch (e) {
+    console.error(`[migrate] failed ${table}.${column}:`, e.message);
+  }
+}
+
+async function migrateDb() {
+  // Safe migrations for databases created by older NumberPlus versions.
+  // Adds missing columns without touching existing data.
+  const migrations = [
+    // users
+    ["users", "whatsapp", "`whatsapp` VARCHAR(40) NULL"],
+    ["users", "customer_id", "`customer_id` VARCHAR(6) NULL"],
+    ["users", "balance", "`balance` DECIMAL(12,2) NOT NULL DEFAULT 0"],
+    ["users", "role", "`role` VARCHAR(20) NOT NULL DEFAULT 'user'"],
+    ["users", "avatar_svg", "`avatar_svg` TEXT NULL"],
+    ["users", "banned", "`banned` TINYINT(1) NOT NULL DEFAULT 0"],
+    ["users", "language", "`language` VARCHAR(5) NOT NULL DEFAULT 'ar'"],
+    ["users", "theme", "`theme` VARCHAR(30) NOT NULL DEFAULT 'dark-blue'"],
+    ["users", "full_name", "`full_name` VARCHAR(120) NULL"],
+    // products
+    ["products", "name_en", "`name_en` VARCHAR(160) NULL"],
+    ["products", "description", "`description` TEXT NULL"],
+    ["products", "description_en", "`description_en` TEXT NULL"],
+    ["products", "category", "`category` VARCHAR(60) NOT NULL DEFAULT 'general'"],
+    ["products", "subcategory", "`subcategory` VARCHAR(60) NULL"],
+    ["products", "price", "`price` DECIMAL(12,2) NOT NULL DEFAULT 0"],
+    ["products", "stock", "`stock` INT NOT NULL DEFAULT 0"],
+    ["products", "max_per_user", "`max_per_user` INT NOT NULL DEFAULT 0"],
+    ["products", "requires_link", "`requires_link` TINYINT(1) NOT NULL DEFAULT 0"],
+    ["products", "requires_number", "`requires_number` TINYINT(1) NOT NULL DEFAULT 0"],
+    ["products", "logo_url", "`logo_url` VARCHAR(500) NULL"],
+    ["products", "active", "`active` TINYINT(1) NOT NULL DEFAULT 1"],
+    ["products", "is_free", "`is_free` TINYINT(1) NOT NULL DEFAULT 0"],
+    // orders
+    ["orders", "order_number", "`order_number` VARCHAR(24) NULL"],
+    ["orders", "quantity", "`quantity` INT NOT NULL DEFAULT 1"],
+    ["orders", "total_price", "`total_price` DECIMAL(12,2) NOT NULL DEFAULT 0"],
+    ["orders", "status", "`status` VARCHAR(20) NOT NULL DEFAULT 'pending'"],
+    ["orders", "link_value", "`link_value` VARCHAR(500) NULL"],
+    ["orders", "number_value", "`number_value` VARCHAR(100) NULL"],
+  ];
+  for (const [table, column, definition] of migrations) {
+    await ensureColumn(table, column, definition);
+  }
+  // Backfill unique customer_id for old users missing one
+  try {
+    if (await columnExists("users", "customer_id")) {
+      const missing = await q("SELECT id FROM users WHERE customer_id IS NULL OR customer_id = '' LIMIT 100");
+      for (const u of missing) {
+        let cid = genCustomerId();
+        for (let i = 0; i < 5; i++) {
+          try {
+            await q("UPDATE users SET customer_id = ? WHERE id = ?", [cid, u.id]);
+            break;
+          } catch (e) {
+            if (e.code === "ER_DUP_ENTRY") cid = genCustomerId();
+            else throw e;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[migrate] customer_id backfill:", e.message);
+  }
+}
+
 async function initDb() {
   const statements = SCHEMA.split(/;\s*\n/).filter((s) => s.trim());
-  for (const st of statements) await pool.query(st);
+  for (const st of statements) {
+    try { await pool.query(st); }
+    catch (e) {
+      // Ignore "table already exists with different definition" style errors;
+      // migrateDb() below reconciles missing columns.
+      if (!/already exists/i.test(e.message)) console.error("[initDb]", e.message);
+    }
+  }
+  await migrateDb();
   // seed default settings
   const defaults = [
     ["support_email", "info@numberplus.me"],
