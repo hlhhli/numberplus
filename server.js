@@ -306,7 +306,10 @@ async function migrateDb() {
   // Adds missing columns without touching existing data.
   const migrations = [
     // users
+    ["users", "username", "`username` VARCHAR(60) NULL"],
+    ["users", "email", "`email` VARCHAR(160) NULL"],
     ["users", "whatsapp", "`whatsapp` VARCHAR(40) NULL"],
+    ["users", "password_hash", "`password_hash` VARCHAR(255) NULL"],
     ["users", "customer_id", "`customer_id` VARCHAR(6) NULL"],
     ["users", "balance", "`balance` DECIMAL(12,2) NOT NULL DEFAULT 0"],
     ["users", "role", "`role` VARCHAR(20) NOT NULL DEFAULT 'user'"],
