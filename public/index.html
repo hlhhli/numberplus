@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090c16">
+  <title>NumberPlus — المتجر الرقمي</title>
+  <style>
+    :root {
+      --bg: #090c16;
+      --panel: rgba(19, 24, 40, .82);
+      --panel-solid: #131828;
+      --panel-soft: rgba(255,255,255,.045);
+      --text: #f4f6ff;
+      --muted: #929bb4;
+      --line: rgba(255,255,255,.09);
+      --accent: #8e6bff;
+      --accent2: #41b6ff;
+      --good: #48d7a0;
+      --danger: #ff6685;
+      --radius: 20px;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      background:
+        radial-gradient(ellipse at 14% 0%, rgba(91,71,211,.22), transparent 38%),
+        radial-gradient(ellipse at 90% 20%, rgba(41,149,226,.14), transparent 34%),
+        var(--bg);
+    }
+    button, input, select, textarea { font: inherit }
+    button, a { -webkit-tap-highlight-color: transparent }
+    a { color: inherit; text-decoration: none }
+    button { color: inherit; cursor: pointer }
+    .app { max-width: 1440px; padding: 24px; margin: auto }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      padding: 14px 18px; margin-bottom: 24px; border: 1px solid var(--line);
+      background: rgba(14,18,31,.76); backdrop-filter: blur(18px);
+      border-radius: 22px; position: sticky; top: 12px; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 190px }
+    .brand svg { width: 42px; height: 42px; flex: none }
+    .brand-name { font-weight: 850; letter-spacing: -.5px; font-size: 19px }
+    .brand-name small { display: block; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 1.5px }
+    .nav { display: flex; gap: 5px; align-items: center; flex-wrap: wrap }
+    .nav a, .nav button {
+      color: var(--muted); border: 0; background: transparent; padding: 10px 12px;
+      border-radius: 12px; font-size: 13px;
+    }
+    .nav a:hover, .nav button:hover, .nav .active { color: var(--text); background: var(--panel-soft) }
+    .top-actions { display: flex; gap: 8px; align-items: center }
+    .icon-btn, .btn {
+      border: 1px solid var(--line); background: var(--panel-soft); border-radius: 12px;
+      padding: 10px 13px; transition: .2s; font-size: 13px;
+    }
+    .icon-btn:hover, .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.24) }
+    .btn.primary {
+      background: linear-gradient(110deg, var(--accent), #5a8bff);
+      border: 0; box-shadow: 0 8px 28px rgba(111,91,245,.25); font-weight: 700;
+    }
+    .btn.ghost { background: transparent }
+    .btn.danger { color: #ff9aaf; border-color: rgba(255,102,133,.25) }
+    .badge {
+      display: inline-flex; align-items: center; border: 1px solid var(--line);
+      background: rgba(255,255,255,.05); color: var(--muted);
+      border-radius: 999px; padding: 5px 10px; font-size: 11px;
+    }
+    .hero {
+      position: relative; overflow: hidden; display: grid; grid-template-columns: 1.3fr .7fr;
+      gap: 30px; padding: clamp(26px, 5vw, 58px); border: 1px solid var(--line);
+      border-radius: 30px; background: linear-gradient(120deg, rgba(112,81,220,.2), rgba(40,157,225,.10)), var(--panel);
+      backdrop-filter: blur(16px); margin-bottom: 24px;
+    }
+    .hero:after {
+      content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%;
+      background: var(--accent); filter: blur(130px); opacity: .15; left: 8%; top: -40%;
+    }
+    .hero-copy, .hero-art { position: relative; z-index: 1 }
+    .eyebrow { color: #b9aaff; font-size: 12px; letter-spacing: .4px }
+    h1 { margin: 14px 0; font-size: clamp(32px, 5vw, 58px); line-height: 1.12; letter-spacing: -1.6px }
+    .gradient-text { background: linear-gradient(90deg, #c2a7ff, #67d2ff); -webkit-background-clip: text; color: transparent }
+    .hero p { color: var(--muted); max-width: 560px; line-height: 1.9; margin-bottom: 24px }
+    .hero-buttons { display: flex; gap: 10px; flex-wrap: wrap }
+    .hero-art { display: grid; place-items: center; min-height: 210px }
+    .orbit {
+      width: min(250px, 60vw); aspect-ratio: 1; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 70px rgba(121,91,255,.15), inset 0 0 40px rgba(77,167,255,.08);
+    }
+    .orbit-inner { width: 67%; aspect-ratio: 1; border-radius: 30%; display: grid; place-items: center;
+      background: linear-gradient(145deg, rgba(139,103,255,.4), rgba(58,179,255,.16));
+      border: 1px solid rgba(255,255,255,.2); font-size: 58px; transform: rotate(-8deg) }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin: 0 0 26px }
+    .stat, .card, .section-box {
+      border: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(15px);
+      border-radius: var(--radius);
+    }
+    .stat { padding: 17px 20px }
+    .stat strong { font-size: 22px; display: block; margin-bottom: 4px }
+    .stat span { color: var(--muted); font-size: 12px }
+    .section-head { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin: 30px 0 15px }
+    .section-head h2 { margin: 0; font-size: 21px }
+    .section-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px }
+    .categories { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px }
+    .category {
+      display: flex; align-items: center; gap: 13px; padding: 17px; cursor: pointer;
+      transition: .2s; text-align: right; color: var(--text);
+    }
+    .category:hover, .product:hover { transform: translateY(-3px); border-color: rgba(147,122,255,.45) }
+    .cat-icon, .product-icon {
+      display: grid; place-items: center; width: 48px; height: 48px; flex: none;
+      border-radius: 15px; background: linear-gradient(140deg, rgba(136,100,255,.24), rgba(58,178,255,.16));
+      font-size: 23px; border: 1px solid rgba(255,255,255,.1)
+    }
+    .category strong { display: block; font-size: 14px }
+    .category small { color: var(--muted); font-size: 11px }
+    .toolbar { display: flex; gap: 10px; align-items: center }
+    .search { min-width: 210px }
+    input, select, textarea {
+      width: 100%; background: rgba(5,8,16,.55); border: 1px solid var(--line);
+      color: var(--text); outline: 0; border-radius: 12px; padding: 12px 13px;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent) }
+    select option { background: var(--panel-solid) }
+    .products { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px }
+    .product { padding: 17px; transition: .2s; display: flex; flex-direction: column; min-height: 235px }
+    .product-top { display: flex; justify-content: space-between; align-items: start }
+    .product h3 { margin: 14px 0 5px; font-size: 15px }
+    .product p { color: var(--muted); font-size: 12px; margin: 0 0 18px; line-height: 1.65 }
+    .product-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: auto; gap: 8px }
+    .price { font-weight: 800; font-size: 17px }
+    .price small { color: var(--muted); font-size: 10px; font-weight: 400 }
+    .buy-btn { padding: 9px 12px; font-size: 12px }
+    .stock { color: var(--good); font-size: 10px }
+    .layout { display: grid; grid-template-columns: 230px 1fr; gap: 20px; align-items: start }
+    .side-panel { padding: 16px; position: sticky; top: 100px }
+    .side-panel h3 { font-size: 14px; margin: 3px 8px 12px }
+    .side-link {
+      border: 0; background: transparent; color: var(--muted); width: 100%; text-align: right;
+      padding: 11px; border-radius: 11px; display: flex; justify-content: space-between; margin: 2px 0;
+    }
+    .side-link:hover, .side-link.active { color: var(--text); background: var(--panel-soft) }
+    .main-content { min-width: 0 }
+    .section-box { padding: 20px; margin-bottom: 15px }
+    .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px }
+    .form-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px }
+    .field label { display: block; color: var(--muted); font-size: 11px; margin: 0 0 7px }
+    .field.full { grid-column: 1 / -1 }
+    .form-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap }
+    .table-wrap { overflow: auto }
+    table { width: 100%; border-collapse: collapse; min-width: 580px; text-align: right; font-size: 12px }
+    th, td { padding: 13px 10px; border-bottom: 1px solid var(--line); white-space: nowrap }
+    th { color: var(--muted); font-weight: 600 }
+    .pill { border-radius: 99px; padding: 5px 9px; font-size: 10px; color: var(--good); background: rgba(72,215,160,.1) }
+    .pill.pending { color: #ffd27a; background: rgba(255,210,122,.1) }
+    .pill.banned { color: #ff91a8; background: rgba(255,102,133,.12) }
+    .empty { color: var(--muted); text-align: center; padding: 35px 10px; font-size: 13px }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.68); display: none; place-items: center; padding: 16px }
+    .modal-backdrop.show { display: grid }
+    .modal { width: min(480px, 100%); padding: 24px; border: 1px solid var(--line); border-radius: 22px; background: #111626; box-shadow: 0 24px 90px rgba(0,0,0,.55) }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px }
+    .modal-head h2 { font-size: 19px; margin: 0 }
+    .modal-close { border: 0; background: transparent; color: var(--muted); font-size: 22px }
+    .modal .field { margin-bottom: 12px }
+    .modal-foot { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 13px 0 0 }
+    .toast { position: fixed; bottom: 20px; left: 20px; z-index: 50; background: #171e30; padding: 13px 18px;
+      border: 1px solid var(--line); border-radius: 14px; opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none }
+    .toast.show { opacity: 1; transform: translateY(0) }
+    .color-grid { display: grid; grid-template-columns: repeat(10,1fr); gap: 8px }
+    .color-dot { aspect-ratio: 1; border: 2px solid transparent; border-radius: 50%; cursor: pointer }
+    .color-dot.selected { outline: 2px solid white; outline-offset: 2px }
+    footer { text-align: center; color: var(--muted); font-size: 11px; padding: 38px 8px 16px }
+    .hidden { display: none !important }
+    body.light {
+      --bg: #edf3ff; --panel: rgba(255,255,255,.78); --panel-solid: #fff;
+      --text: #171b2b; --muted: #66718a; --line: rgba(28,41,75,.12); --panel-soft: rgba(31,51,87,.06);
+      color-scheme: light;
+    }
+    body.light .topbar { background: rgba(255,255,255,.8) }
+    body.light input, body.light select, body.light textarea { background: rgba(245,248,255,.9); color: var(--text) }
+    body.light .modal { background: #fff }
+    @media (max-width: 950px) {
+      .nav { display: none }
+      .products { grid-template-columns: repeat(2,1fr) }
+      .hero { grid-template-columns: 1fr .55fr }
+      .layout { grid-template-columns: 190px 1fr }
+    }
+    @media (max-width: 650px) {
+      .app { padding: 12px }
+      .topbar { top: 6px; padding: 10px 12px; margin-bottom: 14px }
+      .brand { min-width: 0 }
+      .brand-name { font-size: 16px }
+      .brand svg { width: 36px; height: 36px }
+      .top-actions .optional { display: none }
+      .hero { grid-template-columns: 1fr; padding: 28px 22px }
+      .hero-art { min-height: 130px }
+      .orbit { width: 145px }
+      .orbit-inner { font-size: 38px }
+      .stats { gap: 7px }
+      .stat { padding: 13px 10px }
+      .stat strong { font-size: 17px }
+      .stat span { font-size: 10px }
+      .categories { grid-template-columns: repeat(2,1fr); gap: 8px }
+      .category { padding: 12px 10px; gap: 9px }
+      .cat-icon { width: 40px; height: 40px }
+      .products { grid-template-columns: 1fr 1fr; gap: 8px }
+      .product { padding: 13px; min-height: 220px }
+      .product h3 { font-size: 13px }
+      .product p { font-size: 11px }
+      .price { font-size: 15px }
+      .buy-btn { padding: 8px; font-size: 10px }
+      .layout { grid-template-columns: 1fr }
+      .side-panel { position: static; display: flex; gap: 4px; overflow: auto; padding: 8px }
+      .side-panel h3 { display: none }
+      .side-link { width: auto; white-space: nowrap; padding: 9px 11px }
+      .side-link span:last-child { display: none }
+      .form-grid, .grid-2 { grid-template-columns: 1fr }
+      .field.full { grid-column: auto }
+      .search { min-width: 0; width: 100% }
+      .toolbar { width: 100% }
+      .section-head { align-items: start; flex-direction: column }
+      .color-grid { grid-template-columns: repeat(8,1fr) }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="/" data-route="/" aria-label="NumberPlus">
+      <svg viewBox="0 0 64 64" fill="none" role="img" aria-label="NumberPlus logo">
+        <defs><linearGradient id="g" x1="7" y1="7" x2="57" y2="57"><stop stop-color="#a987ff"/><stop offset="1" stop-color="#38c5ff"/></linearGradient></defs>
+        <rect x="3" y="3" width="58" height="58" rx="19" fill="url(#g)"/>
+        <path d="M19 43V21h5l16 15V21h5v22h-5L24 28v15h-5Z" fill="white"/>
+        <path d="M49 13v10M44 18h10" stroke="white" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-name">NumberPlus<small>DIGITAL STORE</small></span>
+    </a>
+    <nav class="nav" aria-label="التنقل الرئيسي">
+      <a href="/" data-route="/" data-i18n="home">الرئيسية</a>
+      <a href="/telegram" data-route="/telegram" data-i18n="telegram">تيليجرام</a>
+      <a href="/whatsapp" data-route="/whatsapp" data-i18n="whatsapp">واتساب</a>
+      <a href="/instagram" data-route="/instagram" data-i18n="instagram">إنستغرام</a>
+      <button data-view="offers" data-i18n="offers">العروض</button>
+      <button data-view="api" data-i18n="api">API</button>
+    </nav>
+    <div class="top-actions">
+      <button class="icon-btn optional" id="languageBtn" title="Language">EN</button>
+      <button class="icon-btn" id="themeBtn" title="تبديل الوضع">☼</button>
+      <button class="btn ghost optional" id="adminShortcut" data-i18n="admin">الإدارة</button>
+      <button class="btn primary" id="loginBtn" data-i18n="login">دخول</button>
+    </div>
+  </header>
+
+  <main id="storeView">
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow" data-i18n="heroEyebrow">متجرك الرقمي الموثوق</span>
+        <h1><span data-i18n="heroLine1">حلول رقمية</span><br><span class="gradient-text" data-i18n="heroLine2">بخطوات بسيطة</span></h1>
+        <p data-i18n="heroText">أرقام وخدمات رقمية متنوعة، تسليم سريع، وتجربة شراء سهلة وآمنة من مكان واحد.</p>
+        <div class="hero-buttons">
+          <a class="btn primary" href="#products" data-i18n="browse">تصفح المنتجات</a>
+          <button class="btn" data-view="balance" data-i18n="addBalance">إضافة رصيد</button>
+        </div>
+      </div>
+      <div class="hero-art"><div class="orbit"><div class="orbit-inner">＋</div></div></div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><strong id="statProducts">8+</strong><span data-i18n="availableProducts">منتجات متاحة</span></div>
+      <div class="stat"><strong>24/7</strong><span data-i18n="support">دعم متواصل</span></div>
+      <div class="stat"><strong>⚡</strong><span data-i18n="fastDelivery">تسليم سريع</span></div>
+    </section>
+
+    <div class="section-head">
+      <div><h2 data-i18n="categories">التصنيفات</h2><p data-i18n="categoriesSub">اختر الخدمة المناسبة لك</p></div>
+    </div>
+    <section class="categories">
+      <a class="category card" href="/whatsapp" data-route="/whatsapp"><span class="cat-icon">💬</span><span><strong data-i18n="whatsapp">واتساب</strong><small data-i18n="numbers">أرقام وخدمات</small></span></a>
+      <a class="category card" href="/telegram" data-route="/telegram"><span class="cat-icon">✈️</span><span><strong data-i18n="telegram">تيليجرام</strong><small data-i18n="numbers">أرقام وخدمات</small></span></a>
+      <a class="category card" href="/instagram" data-route="/instagram"><span class="cat-icon">📸</span><span><strong data-i18n="instagram">إنستغرام</strong><small data-i18n="services">خدمات رقمية</small></span></a>
+      <button class="category card" data-view="offers"><span class="cat-icon">🎁</span><span><strong data-i18n="offers">العروض</strong><small data-i18n="freeOffers">عروض مجانية</small></span></button>
+    </section>
+
+    <div class="section-head" id="products">
+      <div><h2 id="productsTitle" data-i18n="featured">منتجات مميزة</h2><p data-i18n="productsSub">خيارات مختارة من NumberPlus</p></div>
+      <div class="toolbar"><input class="search" id="searchInput" type="search" placeholder="ابحث عن منتج…" aria-label="بحث"></div>
+    </div>
+    <section class="products" id="productGrid"></section>
+    <footer>© <span id="year"></span> NumberPlus · <span data-i18n="footer">متجر الخدمات الرقمية</span></footer>
+  </main>
+
+  <main id="dashboardView" class="hidden">
+    <div class="layout">
+      <aside class="section-box side-panel">
+        <h3 id="panelTitle">لوحة المستخدم</h3>
+        <button class="side-link active" data-panel="overview">نظرة عامة <span>⌂</span></button>
+        <button class="side-link" data-panel="orders">طلباتي <span>▤</span></button>
+        <button class="side-link" data-panel="balance">الرصيد والشحن <span>＋</span></button>
+        <button class="side-link" data-panel="codes">أكواد الهدايا <span>◇</span></button>
+        <button class="side-link" data-panel="tickets">الدعم والتذاكر <span>✉</span></button>
+        <button class="side-link" data-panel="offers">العروض المجانية <span>🎁</span></button>
+        <button class="side-link" data-panel="api">توثيق API <span>⌘</span></button>
+        <button class="side-link hidden" id="adminProductsLink" data-panel="admin-products">إدارة المنتجات <span>＋</span></button>
+        <button class="side-link hidden" id="adminOrdersLink" data-panel="admin-orders">إدارة الطلبات <span>▤</span></button>
+        <button class="side-link hidden" id="adminUsersLink" data-panel="admin-users">إدارة المستخدمين <span>♙</span></button>
+        <button class="side-link hidden" id="adminSettingsLink" data-panel="admin-settings">الإعدادات والأكواد <span>⚙</span></button>
+        <button class="side-link" data-panel="settings">المظهر والإعدادات <span>⚙</span></button>
+        <button class="side-link" id="logoutBtn">تسجيل الخروج <span>↪</span></button>
+      </aside>
+      <section class="main-content" id="panelContent"></section>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head"><h2 id="modalTitle">تسجيل الدخول</h2><button class="modal-close" id="closeModal" aria-label="إغلاق">×</button></div>
+    <div id="modalBody"></div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (s, root=document) => root.querySelector(s);
+  const $$ = (s, root=document) => [...root.querySelectorAll(s)];
+  const store = {
+    products: [
+      {id:1,name:"رقم واتساب — تفعيل فوري",category:"whatsapp",sub:"أرقام",price:.35,stock:24,max:3,icon:"💬",desc:"رقم رقمي مناسب لتفعيل حساب واتساب."},
+      {id:2,name:"رقم واتساب مميز",category:"whatsapp",sub:"أرقام",price:1.25,stock:12,max:2,icon:"📱",desc:"رقم مميز مع تفاصيل التسليم."},
+      {id:3,name:"رقم تيليجرام — عالمي",category:"telegram",sub:"أرقام",price:.5,stock:37,max:5,icon:"✈️",desc:"رقم عالمي لتفعيل حساب تيليجرام."},
+      {id:4,name:"رقم تيليجرام — خاص",category:"telegram",sub:"أرقام",price:1.8,stock:9,max:2,icon:"🌐",desc:"رقم رقمي لفترة توفر محدودة."},
+      {id:5,name:"متابعون إنستغرام",category:"instagram",sub:"خدمات",price:2.5,stock:100,max:10,icon:"📸",desc:"خدمة ترويج لحساب إنستغرام."},
+      {id:6,name:"إعجابات إنستغرام",category:"instagram",sub:"خدمات",price:.8,stock:100,max:20,icon:"💜",desc:"إعجابات لمنشورات إنستغرام."},
+      {id:7,name:"رقم واتساب — اقتصادي",category:"whatsapp",sub:"أرقام",price:.12,stock:18,max:5,icon:"📲",desc:"خيار اقتصادي للتفعيل الرقمي."},
+      {id:8,name:"رقم تيليجرام — اقتصادي",category:"telegram",sub:"أرقام",price:.09,stock:22,max:5,icon:"🛩️",desc:"خيار اقتصادي لتفعيل تيليجرام."}
+    ],
+    orders: JSON.parse(localStorage.getItem("np_orders") || "[]"),
+    tickets: JSON.parse(localStorage.getItem("np_tickets") || "[]"),
+    codes: JSON.parse(localStorage.getItem("np_codes") || "[]"),
+    users: JSON.parse(localStorage.getItem("np_users") || "[]"),
+    balance: Number(localStorage.getItem("np_balance") || 0),
+    currentUser: JSON.parse(sessionStorage.getItem("np_user") || "null"),
+    isAdmin: false, route: location.pathname, lang: "ar"
+  };
+  const translations = {
+    en: {
+      home:"Home", telegram:"Telegram", whatsapp:"WhatsApp", instagram:"Instagram", offers:"Offers", api:"API",
+      admin:"Admin", login:"Sign in", heroEyebrow:"Your trusted digital store", heroLine1:"Digital solutions", heroLine2:"made simple",
+      heroText:"Numbers and digital services, fast delivery, and an easy shopping experience in one place.",
+      browse:"Browse products", addBalance:"Add balance", availableProducts:"Available products", support:"24/7 support",
+      fastDelivery:"Fast delivery", categories:"Categories", categoriesSub:"Choose the service you need", numbers:"Numbers & services",
+      services:"Digital services", freeOffers:"Free offers", featured:"Featured products", productsSub:"Selected options from NumberPlus",
+      footer:"Digital services store"
+    }
+  };
+  const categoryNames = {whatsapp:"واتساب",telegram:"تيليجرام",instagram:"إنستغرام"};
+  const icons = ["#8e6bff","#41b6ff","#ff6b9e","#ff9955","#44d7b6","#e9ba48","#ae6cff","#47a9ff","#ff5680","#8dd85b",
+    "#cf71ff","#44d6e8","#f27764","#6680ff","#ed71b4","#73c9ff","#b4d544","#ffb45c","#7970ff","#54cf94",
+    "#e66bff","#5fcbff","#ff7481","#92bc49","#a18aff","#41a3e2","#ee9bcb","#67c9a0","#f9cb4b","#cb75f0",
+    "#448eff","#ff8265","#63dbd2","#aa6bff","#ff609f","#8daeff","#c7a93e","#5dcbff","#da7c63","#60bf84"];
+
+  function persist() {
+    localStorage.setItem("np_orders", JSON.stringify(store.orders));
+    localStorage.setItem("np_tickets", JSON.stringify(store.tickets));
+    localStorage.setItem("np_codes", JSON.stringify(store.codes));
+    localStorage.setItem("np_users", JSON.stringify(store.users));
+    localStorage.setItem("np_balance", store.balance);
+  }
+  function toast(message) {
+    const el=$("#toast"); el.textContent=message; el.classList.add("show");
+    clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.classList.remove("show"),2600);
+  }
+  function money(n) { return "$" + Number(n).toFixed(2); }
+  function renderProducts(filter=store.route) {
+    const search=$("#searchInput")?.value?.trim().toLowerCase() || "";
+    let items=store.products.filter(p => filter==="/" || filter==="" || p.category===filter.replace("/","") || filter==="/offers");
+    if (filter==="/offers") items=store.products.slice(0,2);
+    items=items.filter(p => (p.name+" "+p.desc+" "+p.category).toLowerCase().includes(search));
+    $("#productsTitle").textContent = filter==="/" ? (store.lang==="ar"?"منتجات مميزة":"Featured products") :
+      filter==="/offers" ? (store.lang==="ar"?"عروض مجانية":"Free offers") : (categoryNames[filter.replace("/","")] || filter.replace("/",""));
+    $("#productGrid").innerHTML = items.length ? items.map(p=>`
+      <article class="product card">
+        <div class="product-top"><span class="product-icon">${p.icon}</span><span class="badge">${categoryNames[p.category]||p.category}</span></div>
+        <h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.desc)}</p>
+        <div class="product-bottom"><div><div class="price">${money(p.price)} <small>USD</small></div><span class="stock">${p.stock>0?`● متوفر (${p.stock})`:"غير متوفر"}</span></div>
+        <button class="btn primary buy-btn" data-buy="${p.id}">شراء</button></div>
+      </article>`).join("") : `<div class="empty" style="grid-column:1/-1">لا توجد منتجات مطابقة.</div>`;
+    $("#statProducts").textContent=store.products.length+"+";
+  }
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function setRoute(path, push=true) {
+    store.route=path || "/";
+    if(push) history.pushState({}, "", store.route);
+    $("#storeView").classList.remove("hidden"); $("#dashboardView").classList.add("hidden");
+    renderProducts(store.route);
+    $$(".nav a").forEach(a=>a.classList.toggle("active",a.dataset.route===store.route));
+  }
+  function openModal(title, html) {
+    $("#modalTitle").textContent=title; $("#modalBody").innerHTML=html; $("#modalBackdrop").classList.add("show");
+  }
+  function closeModal() { $("#modalBackdrop").classList.remove("show"); }
+  function loginModal() {
+    openModal("تسجيل الدخول", `
+      <form id="loginForm">
+        <div class="field"><label>البريد أو اسم المستخدم أو رقم العميل</label><input name="identity" required placeholder="example@gmail.com"></div>
+        <div class="field"><label>كلمة المرور</label><input name="password" type="password" required></div>
+        <div class="field"><label>رمز التحقق لمرة واحدة (OTP)</label><input name="otp" inputmode="numeric" placeholder="رمز OTP"></div>
+        <button class="btn primary" style="width:100%">دخول</button>
+      </form>
+      <p class="modal-foot">تجريبي: استخدم أي بيانات للدخول. ربط OTP وتوثيق الحساب يحتاج إلى backend.</p>
+      <button class="btn ghost" style="width:100%;margin-top:10px" id="showSignup">إنشاء حساب جديد</button>`);
+    $("#loginForm").onsubmit=e=>{e.preventDefault(); const identity=new FormData(e.currentTarget).get("identity");
+      store.currentUser={name:String(identity).split("@")[0]||"عميل",id:"100001"}; sessionStorage.setItem("np_user",JSON.stringify(store.currentUser));
+      closeModal(); showDashboard("overview"); toast("تم تسجيل الدخول في وضع العرض");};
+    $("#showSignup").onclick=signupModal;
+  }
+  function signupModal() {
+    openModal("إنشاء حساب", `
+      <form id="signupForm">
+        <div class="field"><label>الاسم الكامل</label><input name="name" required></div>
+        <div class="field"><label>بريد Gmail</label><input name="email" type="email" required placeholder="name@gmail.com"></div>
+        <div class="field"><label>اسم المستخدم</label><input name="username" required></div>
+        <div class="field"><label>كلمة المرور</label><input name="password" type="password" required minlength="8"></div>
+        <label style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px;margin:10px 0 14px"><input type="checkbox" required style="width:auto"> أوافق على سياسة الخصوصية والشروط</label>
+        <button class="btn primary" style="width:100%">إنشاء حساب وإرسال OTP</button>
+      </form><p class="modal-foot">في هذا النموذج التجريبي يتم إنشاء معرف عميل محلي. لا يتم إرسال OTP فعلياً.</p>`);
+    $("#signupForm").onsubmit=e=>{
+      e.preventDefault(); const d=Object.fromEntries(new FormData(e.currentTarget));
+      if(!String(d.email).toLowerCase().endsWith("@gmail.com")) return toast("يرجى استخدام بريد Gmail");
+      const user={name:d.name, username:d.username, email:d.email, id:String(Math.floor(100000+Math.random()*900000)), avatar:"🌸"};
+      store.users.push({...user,banned:false}); store.currentUser=user; sessionStorage.setItem("np_user",JSON.stringify(user)); persist();
+      closeModal(); showDashboard("overview"); toast("تم إنشاء الحساب التجريبي · رقم العميل "+user.id);
+    };
+  }
+  function showDashboard(panel="overview") {
+    $("#storeView").classList.add("hidden"); $("#dashboardView").classList.remove("hidden");
+    const admin=store.isAdmin;
+    $("#panelTitle").textContent=admin?"لوحة الإدارة":"لوحة المستخدم";
+    ["adminProductsLink","adminOrdersLink","adminUsersLink","adminSettingsLink"].forEach(id=>$("#"+id).classList.toggle("hidden",!admin));
+    $$(".side-link").forEach(b=>b.classList.toggle("active",b.dataset.panel===panel));
+    renderPanel(panel);
+  }
+  function renderPanel(panel) {
+    const user=store.currentUser || {name:"زائر",id:"—",avatar:"🧑"};
+    const content=$("#panelContent");
+    const titleMap={
+      overview:"نظرة عامة",orders:"طلباتي",balance:"الرصيد والشحن",codes:"أكواد الهدايا",tickets:"الدعم والتذاكر",
+      offers:"العروض المجانية",api:"توثيق API",settings:"المظهر والإعدادات","admin-products":"إضافة وإدارة المنتجات",
+      "admin-orders":"إدارة الطلبات","admin-users":"إدارة المستخدمين","admin-settings":"الإعدادات والأكواد"
+    };
+    if(panel==="overview") content.innerHTML=`
+      <div class="section-box"><span class="badge">${store.isAdmin?"مدير المتجر":"حساب العميل"}</span>
+        <h2 style="margin-bottom:6px">${user.avatar||"🧑"} أهلاً، ${escapeHtml(user.name||"عميل")}</h2>
+        <p style="color:var(--muted);font-size:13px">رقم العميل: ${user.id||"100001"} · رصيدك الحالي: <b>${money(store.balance)}</b></p>
+        <div class="form-actions"><button class="btn primary" data-jump="balance">شحن الرصيد</button><button class="btn" data-jump="orders">عرض الطلبات</button></div>
+      </div>
+      <div class="grid-2"><div class="section-box"><span class="badge">الرصيد</span><h2>${money(store.balance)}</h2><p style="color:var(--muted);font-size:12px">الرصيد التجريبي لهذا المتصفح.</p></div>
+      <div class="section-box"><span class="badge">الطلبات</span><h2>${store.orders.length}</h2><p style="color:var(--muted);font-size:12px">إجمالي طلبات الحساب.</p></div></div>`;
+    if(panel==="orders" || panel==="admin-orders") content.innerHTML=`<div class="section-box"><div class="section-head"><div><h2>${titleMap[panel]}</h2><p>متابعة حالة الطلب والتسليم</p></div></div>${ordersTable()}</div>`;
+    if(panel==="balance") content.innerHTML=`
+      <div class="section-box"><h2>الرصيد والشحن</h2><p style="color:var(--muted)">الرصيد الحالي: <b>${money(store.balance)}</b></p>
+      <div class="grid-2">
+        <div class="section-box"><h3>USDT · Cryptomus</h3><p style="color:var(--muted);font-size:12px">واجهة تجريبية — أضف إعدادات API في الخادم لإتمام الدفع تلقائياً.</p><button class="btn primary" data-pay="cryptomus">إنشاء طلب دفع</button></div>
+        <div class="section-box"><h3>طرق دفع يدوية</h3><p style="color:var(--muted);font-size:12px">Zain Cash: أضف رقم الحساب من لوحة الإدارة.<br>Asia Hawala: أضف رقم الحساب من لوحة الإدارة.</p><button class="btn" data-pay="manual">عرض تعليمات الدفع</button></div>
+      </div></div>`;
+    if(panel==="codes") content.innerHTML=`<div class="section-box"><h2>استبدال كود رصيد</h2><p style="color:var(--muted);font-size:12px">أدخل كود الهدية أو الرصيد.</p><div class="toolbar"><input id="redeemCode" placeholder="مثال: NP-ABC123"><button class="btn primary" id="redeemBtn">استبدال</button></div></div>`;
+    if(panel==="tickets") content.innerHTML=`<div class="section-box"><h2>الدعم والتذاكر</h2><div class="form-grid"><div class="field"><label>عنوان التذكرة</label><input id="ticketSubject" placeholder="كيف يمكننا مساعدتك؟"></div><div class="field"><label>رقم الطلب (اختياري)</label><input id="ticketOrder" placeholder="#1001"></div><div class="field full"><label>التفاصيل</label><textarea id="ticketMessage" rows="4" placeholder="اكتب رسالتك…"></textarea></div></div><div class="form-actions"><button class="btn primary" id="createTicket">إرسال التذكرة</button></div></div>
+      <div class="section-box"><h3>تذاكري</h3>${store.tickets.length?store.tickets.map(t=>`<p>${escapeHtml(t.subject)} <span class="pill pending">قيد المراجعة</span></p>`).join(""):'<div class="empty">لا توجد تذاكر بعد.</div>'}</div>`;
+    if(panel==="offers") content.innerHTML=`<div class="section-box"><h2>العروض المجانية</h2><p style="color:var(--muted)">تحقق من العروض المتاحة واستفد منها.</p><div class="grid-2"><div class="section-box"><span class="badge">عرض جديد</span><h3>هدية للمستخدمين الجدد</h3><p style="color:var(--muted);font-size:12px">تفعيل المكافأة يتم عبر إعدادات المتجر.</p><button class="btn primary" id="claimBonus">استلام الهدية</button></div><div class="section-box"><span class="badge">مجاني</span><h3>العروض الموسمية</h3><p style="color:var(--muted);font-size:12px">لا توجد عروض إضافية الآن.</p></div></div></div>`;
+    if(panel==="api") content.innerHTML=`<div class="section-box"><h2>توثيق API</h2><p style="color:var(--muted)">مساحة توثيق واجهة برمجة التطبيقات — أضف تفاصيل نقاط النهاية عند تجهيز backend.</p><h3>مثال الطلب</h3><pre style="direction:ltr;text-align:left;overflow:auto;padding:16px;border-radius:12px;background:rgba(0,0,0,.24);color:#b8d8ff">GET /api/v1/products
+Authorization: Bearer YOUR_API_KEY</pre><p class="modal-foot">لا تضع مفاتيح API السرية في كود الواجهة الأمامية.</p></div>`;
+    if(panel==="settings") content.innerHTML=`<div class="section-box"><h2>المظهر والإعدادات</h2><p style="color:var(--muted)">اختر لون الواجهة من 40 لوناً، وبدّل بين الوضعين.</p><div class="color-grid">${icons.map(c=>`<button class="color-dot ${getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()===c?"selected":""}" style="background:${c}" data-color="${c}" aria-label="لون ${c}"></button>`).join("")}</div><div class="form-actions"><button class="btn" id="dashTheme">تبديل الوضع الفاتح/الداكن</button><button class="btn" id="dashLang">العربية / English</button></div></div>`;
+    if(panel==="admin-products") content.innerHTML=`
+      <div class="section-box"><h2>إضافة منتج</h2><form id="productForm" class="form-grid">
+        <div class="field"><label>اسم المنتج</label><input name="name" required></div>
+        <div class="field"><label>السعر بالدولار (0.05–10000)</label><input name="price" type="number" min=".05" max="10000" step=".01" required></div>
+        <div class="field"><label>الكمية المتاحة</label><input name="stock" type="number" min="0" value="10" required></div>
+        <div class="field"><label>الحد الأقصى لكل مستخدم</label><input name="max" type="number" min="1" value="1" required></div>
+        <div class="field"><label>التصنيف</label><select name="category"><option value="whatsapp">واتساب</option><option value="telegram">تيليجرام</option><option value="instagram">إنستغرام</option></select></div>
+        <div class="field"><label>التصنيف الفرعي</label><input name="sub" placeholder="أرقام / خدمات"></div>
+        <div class="field"><label>رابط اختياري</label><input name="link" type="url" placeholder="https://"></div>
+        <div class="field"><label>رقم اختياري</label><input name="number" placeholder="+000…"></div>
+        <div class="field"><label>أيقونة / إيموجي المنتج</label><input name="icon" placeholder="📦"></div>
+        <div class="field"><label>رابط شعار المنتج (اختياري)</label><input name="logo" type="url" placeholder="https://"></div>
+        <div class="field full"><label>وصف المنتج</label><textarea name="desc" rows="2"></textarea></div>
+        <div class="field full"><button class="btn primary">إضافة المنتج</button></div></form></div>
+      <div class="section-box"><h3>المنتجات الحالية</h3><div class="table-wrap"><table><thead><tr><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>المخزون</th><th>إجراء</th></tr></thead><tbody>${store.products.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${categoryNames[p.category]}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="btn danger" data-delete="${p.id}">حذف</button></td></tr>`).join("")}</tbody></table></div></div>`;
+    if(panel==="admin-users") content.innerHTML=`<div class="section-box"><h2>إدارة المستخدمين</h2><div class="field"><label>البحث بمعرف العميل أو البريد أو اسم المستخدم</label><input id="userSearch" placeholder="ابحث عن مستخدم…"></div><div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>العميل</th><th>المعرف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="userRows"></tbody></table></div><p class="modal-foot">حظر IP والحساب وإعادة تعيين الرصيد تتطلب نظام مصادقة وقاعدة بيانات على الخادم.</p></div>`;
+    if(panel==="admin-settings") content.innerHTML=`
+      <div class="section-box"><h2>طرق الدفع وإعدادات الدعم</h2><div class="form-grid">
+        <div class="field"><label>رقم حساب Zain Cash</label><input id="zainAccount" placeholder="أدخل رقم الحساب"></div>
+        <div class="field"><label>رقم حساب Asia Hawala</label><input id="asiaAccount" placeholder="أدخل رقم الحساب"></div>
+        <div class="field"><label>بريد الدعم</label><input id="supportEmail" type="email" placeholder="support@example.com"></div>
+        <div class="field"><label>معرف دعم / رابط</label><input id="supportLink" placeholder="رابط التواصل"></div>
+        <div class="field full"><button class="btn primary" id="saveSettings">حفظ الإعدادات محلياً</button></div>
+      </div></div>
+      <div class="section-box"><h2>إنشاء كود رصيد</h2><div class="toolbar"><input id="codeAmount" type="number" min=".05" step=".01" placeholder="قيمة الكود بالدولار"><input id="codeCount" type="number" min="1" value="1" placeholder="العدد"><button class="btn primary" id="generateCodes">توليد</button></div><div id="generatedCodes" style="margin-top:14px;color:var(--muted);font-size:12px"></div></div>
+      <div class="section-box"><h2>إرسال إشعار / بريد جماعي</h2><div class="field"><label>الرسالة</label><textarea id="broadcastText" rows="3" placeholder="اكتب إشعار المتجر…"></textarea></div><button class="btn" id="broadcastBtn">إرسال تجريبي</button></div>`;
+    wirePanel(panel);
+  }
+  function ordersTable() {
+    if(!store.orders.length) return '<div class="empty">لا توجد طلبات حالياً.</div>';
+    return `<div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>المنتج</th><th>المبلغ</th><th>الحالة</th><th>تسليم / إجراء</th></tr></thead><tbody>${store.orders.map((o,i)=>`<tr><td>#${o.id}</td><td>${escapeHtml(o.name)}</td><td>${money(o.price)}</td><td><span class="pill ${o.status==="مكتمل"?"":"pending"}">${o.status}</span></td><td>${store.isAdmin&&o.status!=="مكتمل"?`<button class="btn" data-deliver="${i}">تأكيد التسليم</button>`:escapeHtml(o.delivery||"—")}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  function wirePanel(panel) {
+    if(panel==="admin-products") {
+      $("#productForm").onsubmit=e=>{e.preventDefault(); const d=Object.fromEntries(new FormData(e.currentTarget));
+        const price=Number(d.price); if(price<.05||price>10000) return toast("السعر يجب أن يكون بين $0.05 و$10,000");
+        store.products.unshift({id:Date.now(),...d,price,stock:Number(d.stock),max:Number(d.max),icon:d.icon||"📦",desc:d.desc||"خدمة رقمية"});
+        renderPanel("admin-products");renderProducts(store.route);toast("تمت إضافة المنتج");};
+      $$("[data-delete]").forEach(b=>b.onclick=()=>{store.products=store.products.filter(p=>p.id!=b.dataset.delete);renderPanel(panel);renderProducts(store.route);toast("تم حذف المنتج");});
+    }
+    if(panel==="admin-users") {
+      const draw=()=>$("#userRows").innerHTML=store.users.filter(u=>JSON.stringify(u).toLowerCase().includes(($("#userSearch").value||"").toLowerCase())).map((u,i)=>`<tr><td>${escapeHtml(u.name||u.username||"مستخدم")}</td><td>${u.id}</td><td><span class="pill ${u.banned?"banned":""}">${u.banned?"محظور":"نشط"}</span></td><td><button class="btn ${u.banned?"":"danger"}" data-ban="${i}">${u.banned?"إلغاء الحظر":"حظر الحساب"}</button></td></tr>`).join("") || '<tr><td colspan="4">لا يوجد مستخدمون بعد.</td></tr>');
+      draw();$("#userSearch").oninput=draw;$("#userRows").onclick=e=>{const b=e.target.closest("[data-ban]");if(!b)return;const u=store.users[b.dataset.ban];u.banned=!u.banned;persist();draw();};
+    }
+    if(panel==="admin-settings") {
+      $("#generateCodes").onclick=()=>{const amount=Number($("#codeAmount").value),count=Math.min(100,Number($("#codeCount").value)||1);if(amount<.05)return toast("أدخل قيمة صحيحة");
+        const made=Array.from({length:count},()=>({code:"NP-"+Math.random().toString(36).slice(2,8).toUpperCase(),amount,used:false}));
+        store.codes.push(...made);persist();$("#generatedCodes").innerHTML=made.map(c=>`<div>${c.code} — ${money(c.amount)}</div>`).join("");toast("تم إنشاء الأكواد التجريبية");};
+      $("#saveSettings").onclick=()=>{localStorage.setItem("np_payment_settings",JSON.stringify({zain:$("#zainAccount").value,asia:$("#asiaAccount").value,support:$("#supportEmail").value,link:$("#supportLink").value}));toast("تم الحفظ على هذا الجهاز");};
+      $("#broadcastBtn").onclick=()=>toast($("#broadcastText").value?"تم تسجيل الإشعار التجريبي":"اكتب رسالة أولاً");
+    }
+    if(panel==="codes") $("#redeemBtn").onclick=()=>{const code=$("#redeemCode").value.trim().toUpperCase();const item=store.codes.find(c=>c.code===code&&!c.used);if(!item)return toast("الكود غير صالح أو مستخدم");
+      item.used=true;store.balance+=item.amount;persist();renderPanel("codes");toast("تمت إضافة "+money(item.amount)+" إلى رصيدك");};
+    if(panel==="tickets") $("#createTicket").onclick=()=>{const subject=$("#ticketSubject").value.trim(),message=$("#ticketMessage").value.trim();if(!subject||!message)return toast("أكمل عنوان التذكرة والتفاصيل");
+      store.tickets.unshift({subject,message,date:new Date().toISOString()});persist();renderPanel("tickets");toast("تم إرسال التذكرة");};
+    if(panel==="offers") $("#claimBonus").onclick=()=>toast("إعداد مكافأة المستخدم الجديد يحتاج تفعيلها من الخادم");
+    if(panel==="settings") {
+      $$(".color-dot").forEach(b=>b.onclick=()=>{document.documentElement.style.setProperty("--accent",b.dataset.color);$$(".color-dot").forEach(x=>x.classList.remove("selected"));b.classList.add("selected");localStorage.setItem("np_accent",b.dataset.color);});
+      $("#dashTheme").onclick=toggleTheme;$("#dashLang").onclick=toggleLanguage;
+    }
+    $$("[data-jump]").forEach(b=>b.onclick=()=>renderPanel(b.dataset.jump));
+    $$("[data-deliver]").forEach(b=>b.onclick=()=>{const o=store.orders[b.dataset.deliver];o.status="مكتمل";o.delivery="تم التسليم";persist();renderPanel(panel);toast("تم تحديث حالة الطلب");});
+    $$("[data-pay]").forEach(b=>b.onclick=()=>toast(b.dataset.pay==="cryptomus"?"الدفع يتطلب ربط Cryptomus API بالخادم":"أضف تعليمات الحساب من إعدادات لوحة الإدارة"));
+  }
+  function toggleTheme() {
+    document.body.classList.toggle("light");localStorage.setItem("np_theme",document.body.classList.contains("light")?"light":"dark");
+  }
+  function toggleLanguage() {
+    store.lang=store.lang==="ar"?"en":"ar";
+    document.documentElement.lang=store.lang;document.documentElement.dir=store.lang==="ar"?"rtl":"ltr";
+    $("#languageBtn").textContent=store.lang==="ar"?"EN":"ع";
+    $$("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;el.textContent=store.lang==="ar"?({
+      home:"الرئيسية",telegram:"تيليجرام",whatsapp:"واتساب",instagram:"إنستغرام",offers:"العروض",api:"API",admin:"الإدارة",login:"دخول",
+      heroEyebrow:"متجرك الرقمي الموثوق",heroLine1:"حلول رقمية",heroLine2:"بخطوات بسيطة",heroText:"أرقام وخدمات رقمية متنوعة، تسليم سريع، وتجربة شراء سهلة وآمنة من مكان واحد.",
+      browse:"تصفح المنتجات",addBalance:"إضافة رصيد",availableProducts:"منتجات متاحة",support:"دعم متواصل",fastDelivery:"تسليم سريع",
+      categories:"التصنيفات",categoriesSub:"اختر الخدمة المناسبة لك",numbers:"أرقام وخدمات",services:"خدمات رقمية",freeOffers:"عروض مجانية",
+      featured:"منتجات مميزة",productsSub:"خيارات مختارة من NumberPlus",footer:"متجر الخدمات الرقمية"
+    })[key]:translations.en[key]||el.textContent;});
+    renderProducts(store.route);
+  }
+  function buyProduct(id) {
+    const p=store.products.find(x=>x.id==id); if(!p)return;
+    if(!store.currentUser) return loginModal();
+    if(p.stock<=0)return toast("المنتج غير متوفر حالياً");
+    if(store.balance<p.price) return toast("رصيدك غير كافٍ — أضف رصيداً أولاً");
+    store.balance-=p.price;p.stock--;
+    store.orders.unshift({id:String(Date.now()).slice(-7),name:p.name,price:p.price,status:"قيد التجهيز",delivery:""});
+    persist();renderProducts(store.route);toast("تم إنشاء الطلب التجريبي");
+  }
+
+  document.addEventListener("click",e=>{
+    const route=e.target.closest("[data-route]");
+    if(route){e.preventDefault();setRoute(route.dataset.route);return;}
+    const view=e.target.closest("[data-view]");
+    if(view){showDashboard(view.dataset.view);return;}
+    const buy=e.target.closest("[data-buy]");if(buy)buyProduct(buy.dataset.buy);
+    const panel=e.target.closest("[data-panel]");if(panel)showDashboard(panel.dataset.panel);
+  });
+  $("#searchInput").addEventListener("input",()=>renderProducts(store.route));
+  $("#loginBtn").onclick=()=>store.currentUser?showDashboard("overview"):loginModal();
+  $("#adminShortcut").onclick=()=>{store.isAdmin=!store.isAdmin;if(store.isAdmin){store.currentUser=store.currentUser||{name:"مدير المتجر",id:"ADMIN"};showDashboard("overview");toast("وضع الإدارة التجريبي");}else setRoute("/");};
+  $("#closeModal").onclick=closeModal;
+  $("#modalBackdrop").onclick=e=>{if(e.target.id==="modalBackdrop")closeModal();};
+  $("#languageBtn").onclick=toggleLanguage;
+  $("#themeBtn").onclick=toggleTheme;
+  $("#logoutBtn").onclick=()=>{store.currentUser=null;store.isAdmin=false;sessionStorage.removeItem("np_user");setRoute("/");toast("تم تسجيل الخروج");};
+  window.addEventListener("popstate",()=>setRoute(location.pathname,false));
+  document.documentElement.style.setProperty("--accent",localStorage.getItem("np_accent")||"#8e6bff");
+  if(localStorage.getItem("np_theme")==="light")document.body.classList.add("light");
+  $("#year").textContent=new Date().getFullYear();
+  setRoute(location.pathname,false);
+</script>
+</body>
+</html>
