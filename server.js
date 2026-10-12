@@ -280,6 +280,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   INDEX idx_tuser2 (user_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS banned_ips (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ip VARCHAR(45) UNIQUE NOT NULL,
+  reason VARCHAR(200) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `;
 
 async function columnExists(table, column) {
@@ -433,6 +439,22 @@ async function maybePromote(email) {
 const isGmail = (e) => /^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(String(e).trim());
 
 // ---------- Routes ----------
+// Block banned IPs (health check exempt so monitoring stays green)
+function getClientIp(req) {
+  return (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket.remoteAddress || "";
+}
+app.use(async (req, res, next) => {
+  if (req.path === "/api/health") return next();
+  try {
+    const ip = getClientIp(req);
+    if (ip) {
+      const [rows] = await pool.execute("SELECT id FROM banned_ips WHERE ip=? LIMIT 1", [ip]);
+      if (rows.length) return res.status(403).json({ error: "ip_banned" });
+    }
+  } catch (e) { /* don't block on db error */ }
+  next();
+});
+
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 // ---------- Auth routes ----------
@@ -814,6 +836,24 @@ app.post("/api/admin/users/:id/balance", auth, admin, async (req, res) => {
 });
 app.post("/api/admin/users/:id/reset-balance", auth, admin, async (req, res) => {
   try { await q("UPDATE users SET balance=0 WHERE id=?", [req.params.id]); res.json({ ok: true }); }
+  catch (e) { console.error(e); res.status(500).json({ error: "server_error" }); }
+});
+
+// IP bans
+app.get("/api/admin/banned-ips", auth, admin, async (req, res) => {
+  try { const rows = await q("SELECT * FROM banned_ips ORDER BY id DESC"); res.json({ ok: true, ips: rows }); }
+  catch (e) { console.error(e); res.status(500).json({ error: "server_error" }); }
+});
+app.post("/api/admin/banned-ips", auth, admin, async (req, res) => {
+  try {
+    const { ip, reason } = req.body || {};
+    if (!ip) return res.status(400).json({ error: "missing_ip" });
+    await q("INSERT IGNORE INTO banned_ips (ip, reason) VALUES (?, ?)", [String(ip).trim(), String(reason || "").trim() || null]);
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "server_error" }); }
+});
+app.delete("/api/admin/banned-ips/:id", auth, admin, async (req, res) => {
+  try { await q("DELETE FROM banned_ips WHERE id=?", [req.params.id]); res.json({ ok: true }); }
   catch (e) { console.error(e); res.status(500).json({ error: "server_error" }); }
 });
 
